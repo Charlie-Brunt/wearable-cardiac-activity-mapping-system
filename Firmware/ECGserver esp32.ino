@@ -10,7 +10,7 @@
 
 float reading;
 int wave_frequency = 5; // Hz
-int sampling_freq = 200; // Hz
+int sampling_freq = 250; // Hz
 
 // Timer variables
 unsigned long lastTime = 0;
