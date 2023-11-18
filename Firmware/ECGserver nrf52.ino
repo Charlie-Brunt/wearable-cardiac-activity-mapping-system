@@ -9,16 +9,16 @@
 BLEService testDataService(SERVICE_UUID);
  
 // Bluetooth® Low Energy Battery Test Data Characteristic
-BLECharacteristic testDataChar(CHARACTERISTIC_UUID, BLERead | BLENotify, 200);
+BLECharacteristic testDataChar(CHARACTERISTIC_UUID, BLERead | BLENotify, 244); //244
 // remote clients will be able to get notifications if this characteristic changes
 
 unsigned short value;
 int wave_frequency = 2; // Hz
-int sampling_freq = 250; // Hz
+int sampling_freq = 200; // Hz
 unsigned long previousMillis = 0;
 unsigned int timerDelay = 1000/sampling_freq; // ms
 
-const int bufferSize = 100;  // Adjust the buffer size as needed
+const int bufferSize = 122;  // Adjust the buffer size as needed
 unsigned short valueBuffer[bufferSize];
 int bufferIndex = 0;
 
@@ -72,7 +72,7 @@ void loop()
       }
     }
     // when the central disconnects, turn off the LED:
-    digitalWrite(LED_BUILTIN, LOW);
+    digitalWrite(LED_BLUE, HIGH);
     Serial.print("Disconnected from central: ");
     Serial.println(central.address());
   }
@@ -81,7 +81,7 @@ void loop()
 void updateValue()
 {
   value = 256*sin(2*M_PI*wave_frequency*0.001*millis()) + 512; 
-  Serial.println(value);
+  // Serial.println(value);
   valueBuffer[bufferIndex] = value;
   bufferIndex++;
 }
@@ -95,4 +95,5 @@ void sendBufferOverBLE() {
 
   // // Transmit the entire buffer over BLE
   testDataChar.writeValue(dataBuffer, bufferSize * sizeof(unsigned short));
+  Serial.println(millis());
 }
