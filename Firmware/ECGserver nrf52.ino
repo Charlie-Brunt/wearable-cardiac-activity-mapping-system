@@ -9,16 +9,16 @@
 BLEService testDataService(SERVICE_UUID);
  
 // Bluetooth® Low Energy Battery Test Data Characteristic
-BLECharacteristic testDataChar(CHARACTERISTIC_UUID, BLERead | BLENotify, 20);
+BLECharacteristic testDataChar(CHARACTERISTIC_UUID, BLERead | BLENotify, 200);
 // remote clients will be able to get notifications if this characteristic changes
 
 unsigned short value;
 int wave_frequency = 2; // Hz
 int sampling_freq = 250; // Hz
-unsigned long previousMillis = 0;  // last time the battery level was checked, in ms
+unsigned long previousMillis = 0;
 unsigned int timerDelay = 1000/sampling_freq; // ms
 
-const int bufferSize = 10;  // Adjust the buffer size as needed
+const int bufferSize = 100;  // Adjust the buffer size as needed
 unsigned short valueBuffer[bufferSize];
 int bufferIndex = 0;
 
@@ -39,8 +39,8 @@ void setup()
   BLE.setAdvertisedService(testDataService); // add the service UUID
   testDataService.addCharacteristic(testDataChar);
   BLE.addService(testDataService); // Add the battery service
+  Serial.println("Advertising, waiting for connections...");
   BLE.advertise();
-  Serial.println("Bluetooth® device active, waiting for connections...");
 }
  
 void loop()
@@ -90,9 +90,9 @@ void sendBufferOverBLE() {
   // Create a buffer to hold the entire data
   byte dataBuffer[bufferSize * sizeof(unsigned short)];
 
-  // Copy sensorBuffer to dataBuffer
+  // // Copy sensorBuffer to dataBuffer
   memcpy(dataBuffer, valueBuffer, bufferSize * sizeof(unsigned short));
 
-  // Transmit the entire buffer over BLE
+  // // Transmit the entire buffer over BLE
   testDataChar.writeValue(dataBuffer, bufferSize * sizeof(unsigned short));
 }
