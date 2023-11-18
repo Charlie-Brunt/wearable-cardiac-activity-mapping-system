@@ -1,6 +1,6 @@
 import asyncio
 import sys
-from bleak import BleakClient
+from bleak import BleakClient, BleakScanner
 import struct
 
 UUID = 'ca73b3ba-39f6-4ab3-91ae-186dc9577d99'
