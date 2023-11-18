@@ -13,7 +13,7 @@ BLECharacteristic testDataChar(CHARACTERISTIC_UUID, BLERead | BLENotify, 20);
 // remote clients will be able to get notifications if this characteristic changes
 
 unsigned short value;
-int wave_frequency = 5; // Hz
+int wave_frequency = 2; // Hz
 int sampling_freq = 250; // Hz
 unsigned long previousMillis = 0;  // last time the battery level was checked, in ms
 unsigned int timerDelay = 1000/sampling_freq; // ms
