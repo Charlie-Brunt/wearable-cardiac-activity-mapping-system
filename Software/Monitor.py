@@ -160,7 +160,6 @@ if __name__== "__main__":
     canvas.draw()
 
     # Schedule the first update
-    t_start = time.time()
     root.after(1, update_plots, buffer)
 
     # Run the Tkinter event loop
