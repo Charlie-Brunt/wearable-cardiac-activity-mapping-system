@@ -37,7 +37,8 @@ def update_plots(buffer):
     # bits = port.read(CHUNK_SIZE//60) # ~ 30 fps
     # decoded_bits = np.frombuffer(bits, dtype=np.uint8)
 
-    decoded_bits = np.sin(2*np.pi*50*timer)
+    # decoded_bits = np.sin(2*np.pi*50*timer)
+    decoded_bits = np.random.randint(0, 255, UPDATE_SIZE)
     decoded_bits = (decoded_bits - np.average(decoded_bits))/256
     # r.extend(decoded_bits)
     # data = np.array(r)
