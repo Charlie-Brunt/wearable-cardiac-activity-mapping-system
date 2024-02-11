@@ -1,23 +1,23 @@
 import sys
 import time
-from pyqtgraph.Qt import QtCore, QtGui
+from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
 import numpy as np
 import pyqtgraph as pg
 
 
-class App(QtGui.QMainWindow):
+class App(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(App, self).__init__(parent)
 
         #### Create Gui Elements ###########
-        self.mainbox = QtGui.QWidget()
+        self.mainbox = QtWidgets.QWidget()
         self.setCentralWidget(self.mainbox)
-        self.mainbox.setLayout(QtGui.QVBoxLayout())
+        self.mainbox.setLayout(QtWidgets.QVBoxLayout())
 
         self.canvas = pg.GraphicsLayoutWidget()
         self.mainbox.layout().addWidget(self.canvas)
 
-        self.label = QtGui.QLabel()
+        self.label = QtWidgets.QLabel()
         self.mainbox.layout().addWidget(self.label)
 
         self.view = self.canvas.addViewBox()
@@ -69,7 +69,7 @@ class App(QtGui.QMainWindow):
 
 if __name__ == '__main__':
 
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     thisapp = App()
     thisapp.show()
     sys.exit(app.exec_())
