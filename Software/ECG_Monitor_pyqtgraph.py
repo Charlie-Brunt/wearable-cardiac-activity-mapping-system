@@ -1,8 +1,10 @@
 import sys
 import time
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
+from numpy_ringbuffer import RingBuffer
 import numpy as np
 import pyqtgraph as pg
+import serial
 
 class App(QtWidgets.QMainWindow):
     def __init__(self, num_plots, parent=None):
@@ -18,17 +20,6 @@ class App(QtWidgets.QMainWindow):
         # graphicslayoutwidget for plotting
         self.canvas = pg.GraphicsLayoutWidget()
         self.mainbox.layout().addWidget(self.canvas)
-
-        # line plots
-        self.plots = []
-        cmap = pg.ColorMap([0, num_plots-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])  # Create a gradient color map with lightened blue and red-based colors
-        for i in range(num_plots):
-            color = cmap.map(i)
-            plot = self.canvas.addPlot(labels={"left": f"Plot {i+1}"})
-            h = plot.plot(pen=color)
-            plot.setLabel("left", f"Plot {i+1}")
-            self.plots.append(h)
-            self.canvas.nextRow()
 
         # Create a widget for FPS counter and Pause button
         self.controls_widget = QtWidgets.QWidget()
@@ -47,9 +38,7 @@ class App(QtWidgets.QMainWindow):
         self.controls_widget.layout().addWidget(self.pause_button)
 
         #### Set Data  #####################
-
         self.x = np.linspace(0,50., num=100)
-
         self.counter = 0
         self.fps = 0.
         self.lastupdate = time.time()
@@ -58,7 +47,25 @@ class App(QtWidgets.QMainWindow):
         self.update_enabled = True
 
         #### Start  #####################
+        self.create_plots(num_plots)
         self._update()
+        self.showMaximized() # Maximise main window
+
+    def create_plots(self, num_plots):
+        # line plots
+        self.plots = []
+        cmap = pg.ColorMap([0, num_plots-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])
+        font = QtGui.QFont()
+        font.setPixelSize(10)
+        for i in range(num_plots):
+            color = cmap.map(i)
+            plot = self.canvas.addPlot(labels={"left": f"Plot {i+1}"})
+            plot.setLabel("left", f"Plot {i+1}")
+            plot.getAxis("bottom").setStyle(tickFont = font)
+            plot.getAxis("left").setStyle(tickFont = font)
+            h = plot.plot(pen=color)
+            self.plots.append(h)
+            self.canvas.nextRow()
 
     def _update(self):
         if self.update_enabled:
@@ -84,7 +91,7 @@ class App(QtWidgets.QMainWindow):
         fps2 = 1.0 / dt
         self.lastupdate = now
         self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = 'Mean Frame Rate:  {fps:.3f} FPS'.format(fps=self.fps )
+        tx = 'Frame Rate:  {fps:.1f} FPS'.format(fps=self.fps )
         self.label.setText(tx)
 
     def read_from_com_port(self, port, baudrate=192000, timeout=None):
