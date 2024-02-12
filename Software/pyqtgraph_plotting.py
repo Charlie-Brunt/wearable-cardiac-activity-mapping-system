@@ -4,10 +4,11 @@ from PyQt5 import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
 
-
 class App(QtWidgets.QMainWindow):
     def __init__(self, num_plots, parent=None):
         super(App, self).__init__(parent)
+
+        self.setWindowTitle("BSPM Monitor")  # Set the window title
 
         #### Create Gui Elements ###########
         self.mainbox = QtWidgets.QWidget()
@@ -98,7 +99,6 @@ class App(QtWidgets.QMainWindow):
         except serial.SerialException as e:
             print(f"Serial port error: {e}")
             return None
-
 
 
 if __name__ == '__main__':
