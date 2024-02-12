@@ -5,6 +5,7 @@ from numpy_ringbuffer import RingBuffer
 import numpy as np
 import pyqtgraph as pg
 import serial
+import qdarktheme
 
 class App(QtWidgets.QMainWindow):
     def __init__(self, num_plots, parent=None):
@@ -111,7 +112,9 @@ class App(QtWidgets.QMainWindow):
 if __name__ == '__main__':
 
     app = QtWidgets.QApplication(sys.argv)
+    qdarktheme.setup_theme("auto")
     num_plots = 5
     ecg_app = App(num_plots)
+
     ecg_app.show()
     sys.exit(app.exec_())
