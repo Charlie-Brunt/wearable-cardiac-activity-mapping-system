@@ -1,12 +1,12 @@
 import sys
 import time
-from pyqtgraph.Qt import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 import numpy as np
 import pyqtgraph as pg
 
 
 class App(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, num_plots, parent=None):
         super(App, self).__init__(parent)
 
         #### Create Gui Elements ###########
@@ -14,46 +14,68 @@ class App(QtWidgets.QMainWindow):
         self.setCentralWidget(self.mainbox)
         self.mainbox.setLayout(QtWidgets.QVBoxLayout())
 
+        # graphicslayoutwidget for plotting
         self.canvas = pg.GraphicsLayoutWidget()
         self.mainbox.layout().addWidget(self.canvas)
 
+        # line plots
+        self.plots = []
+        cmap = pg.ColorMap([0, num_plots-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])  # Create a gradient color map with lightened blue and red-based colors
+        for i in range(num_plots):
+            color = cmap.map(i)
+            plot = self.canvas.addPlot(labels={"left": f"Plot {i+1}"})
+            h = plot.plot(pen=color)
+            plot.setLabel("left", f"Plot {i+1}")
+            self.plots.append(h)
+            self.canvas.nextRow()
+
+        # Create a widget for FPS counter and Pause button
+        self.controls_widget = QtWidgets.QWidget()
+        self.controls_widget.setLayout(QtWidgets.QHBoxLayout())
+        self.mainbox.layout().addWidget(self.controls_widget)
+        self.controls_widget.setMaximumHeight(40)
+    
+        # fps counter label widget
         self.label = QtWidgets.QLabel()
-        self.mainbox.layout().addWidget(self.label)
+        self.controls_widget.layout().addWidget(self.label)
 
-        self.view = self.canvas.addViewBox()
-        self.view.setAspectLocked(True)
-        self.view.setRange(QtCore.QRectF(0,0, 100, 100))
-
-        #  image plot
-        self.img = pg.ImageItem(border='w')
-        self.view.addItem(self.img)
-
-        self.canvas.nextRow()
-        #  line plot
-        self.otherplot = self.canvas.addPlot()
-        self.h2 = self.otherplot.plot(pen='y')
-
+        # Add pause button
+        self.pause_button = QtWidgets.QPushButton("Pause")
+        self.pause_button.setMaximumWidth(80)  # Adjust button width
+        self.pause_button.clicked.connect(self.toggle_update)
+        self.controls_widget.layout().addWidget(self.pause_button)
 
         #### Set Data  #####################
 
         self.x = np.linspace(0,50., num=100)
-        self.X,self.Y = np.meshgrid(self.x,self.x)
 
         self.counter = 0
         self.fps = 0.
         self.lastupdate = time.time()
 
+        # Flag to control updates
+        self.update_enabled = True
+
         #### Start  #####################
         self._update()
 
     def _update(self):
+        if self.update_enabled:
+            self.ydata = np.sin(self.x/3.+ self.counter/9.)
 
-        self.data = np.sin(self.X/3.+self.counter/9.)*np.cos(self.Y/3.+self.counter/9.)
-        self.ydata = np.sin(self.x/3.+ self.counter/9.)
+            for plot in self.plots:
+                plot.setData(self.ydata)
 
-        self.img.setImage(self.data)
-        self.h2.setData(self.ydata)
+            self.fps_counter()
+        QtCore.QTimer.singleShot(1, self._update)
+        self.counter += 1
 
+    def toggle_update(self):
+        new_label = "Resume" if self.update_enabled else "Pause"
+        self.update_enabled = not self.update_enabled
+        self.pause_button.setText(new_label)
+
+    def fps_counter(self):
         now = time.time()
         dt = (now-self.lastupdate)
         if dt <= 0:
@@ -63,13 +85,26 @@ class App(QtWidgets.QMainWindow):
         self.fps = self.fps * 0.9 + fps2 * 0.1
         tx = 'Mean Frame Rate:  {fps:.3f} FPS'.format(fps=self.fps )
         self.label.setText(tx)
-        QtCore.QTimer.singleShot(1, self._update)
-        self.counter += 1
+
+    def read_from_com_port(self, port, baudrate=192000, timeout=None):
+        try:
+            ser = serial.Serial(port, baudrate, timeout=timeout)
+            if ser.isOpen():
+                data = ser.read_all().decode('utf-8')
+                return data
+            else:
+                print("Could not open serial port.")
+                return None
+        except serial.SerialException as e:
+            print(f"Serial port error: {e}")
+            return None
+
 
 
 if __name__ == '__main__':
 
     app = QtWidgets.QApplication(sys.argv)
-    thisapp = App()
-    thisapp.show()
+    num_plots = 5
+    ecg_app = App(num_plots)
+    ecg_app.show()
     sys.exit(app.exec_())
