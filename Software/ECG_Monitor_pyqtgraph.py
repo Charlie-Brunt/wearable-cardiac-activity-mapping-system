@@ -13,20 +13,30 @@ class App(QtWidgets.QMainWindow):
 
         self.setWindowTitle("BSPM Monitor")  # Set the window title
 
+        # Scroll Area which contains the widgets, set as the centralWidget
+
         #### Create Gui Elements ###########
         self.mainbox = QtWidgets.QWidget()
         self.setCentralWidget(self.mainbox)
         self.mainbox.setLayout(QtWidgets.QVBoxLayout())
 
+        # Scroll area
+        self.scroll = QtWidgets.QScrollArea()
+        self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        self.scroll.setWidgetResizable(True)
+        self.mainbox.layout().addWidget(self.scroll)
+
         # graphicslayoutwidget for plotting
         self.canvas = pg.GraphicsLayoutWidget()
+        self.canvas.setLayout(QtWidgets.QVBoxLayout())
         self.mainbox.layout().addWidget(self.canvas)
+        self.scroll.setWidget(self.canvas)
 
         # Create a widget for FPS counter and Pause button
         self.controls_widget = QtWidgets.QWidget()
         self.controls_widget.setLayout(QtWidgets.QHBoxLayout())
         self.mainbox.layout().addWidget(self.controls_widget)
-        self.controls_widget.setMaximumHeight(40)
+        self.controls_widget.setMaximumHeight(50)
     
         # fps counter label widget
         self.label = QtWidgets.QLabel()
@@ -67,6 +77,7 @@ class App(QtWidgets.QMainWindow):
             h = plot.plot(pen=color)
             self.plots.append(h)
             self.canvas.nextRow()
+            
 
     def _update(self):
         if self.update_enabled:
