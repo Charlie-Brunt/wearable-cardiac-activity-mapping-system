@@ -13,9 +13,7 @@ class App(QtWidgets.QMainWindow):
 
         self.setWindowTitle("BSPM Monitor")  # Set the window title
 
-        # Scroll Area which contains the widgets, set as the centralWidget
-
-        #### Create Gui Elements ###########
+        # Create Gui Elements
         self.mainbox = QtWidgets.QWidget()
         self.setCentralWidget(self.mainbox)
         self.mainbox.setLayout(QtWidgets.QVBoxLayout())
