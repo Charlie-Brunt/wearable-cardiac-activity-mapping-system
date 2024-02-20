@@ -4,19 +4,17 @@ import platform
 import serial.tools.list_ports
 
 
-def find_arduino_port():
+def connect_to_arduino(baudrate):
     arduino_ports = list(serial.tools.list_ports.comports())
     for p in arduino_ports:
+        print(p[1])
         if "XIAO" in p[1]:
-            return p[0]
+            arduino_port = p[0]
+            print("Connecting to Arduino on port:", arduino_port)
+            ser = serial.Serial(arduino_port, baudrate=baudrate, timeout=1)
+            return ser      
     print("Couldn't find Arduino port.")
     sys.exit(1)
-
-def connect_to_arduino(baudrate):
-    arduino_port = find_arduino_port()
-    print("Connecting to Arduino on port:", arduino_port)
-    ser = serial.Serial(arduino_port, baudrate=baudrate, timeout=1)
-    return ser
 
 
 # Configure the serial port
