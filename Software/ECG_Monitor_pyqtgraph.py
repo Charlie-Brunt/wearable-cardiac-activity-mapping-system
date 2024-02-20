@@ -117,6 +117,18 @@ class App(QtWidgets.QMainWindow):
             print(f"Serial port error: {e}")
             return None
 
+    def connect_to_arduino(baudrate=115200):
+        arduino_ports = list(serial.tools.list_ports.comports())
+        for p in arduino_ports:
+            print(p[1])
+            if "XIAO" in p[1]:
+                arduino_port = p[0]
+                print("Connecting to Arduino on port:", arduino_port)
+                ser = serial.Serial(arduino_port, baudrate=baudrate, timeout=1)
+                return ser      
+        print("Couldn't find Arduino port.")
+        sys.exit(1)
+
 
 if __name__ == '__main__':
 

@@ -5,16 +5,30 @@ import serial.tools.list_ports
 
 
 def connect_to_arduino(baudrate):
-    arduino_ports = list(serial.tools.list_ports.comports())
-    for p in arduino_ports:
-        print(p[1])
-        if "XIAO" in p[1]:
-            arduino_port = p[0]
-            print("Connecting to Arduino on port:", arduino_port)
-            ser = serial.Serial(arduino_port, baudrate=baudrate, timeout=1)
-            return ser      
-    print("Couldn't find Arduino port.")
-    sys.exit(1)
+    if platform.system() == "Darwin":
+        arduino_ports = list(serial.tools.list_ports.comports())
+        for p in arduino_ports:
+            print(p[1])
+            if "XIAO" in p[1]:
+                arduino_port = p[0]
+                print("Connecting to Arduino on port:", arduino_port)
+                ser = serial.Serial(arduino_port, baudrate, timeout=1)
+                return ser
+        print("Couldn't find Arduino port.")
+        sys.exit(1)
+    elif platform.system() == "Windows":
+        arduino_ports = ["COM" + str(i + 1) for i in range(256)]
+        for p in arduino_port:
+            try:
+                ser = serial.Serial(p, baudrate, timeout=1)
+            except:
+                pass
+        print("Couldn't find Arduino port.")
+        sys.exit(1)
+    else:
+        print("Unsupported platform")
+        sys.exit(1)
+    
 
 
 # Configure the serial port
