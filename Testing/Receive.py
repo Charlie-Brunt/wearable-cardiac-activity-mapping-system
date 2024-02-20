@@ -29,7 +29,6 @@ def connect_to_arduino(baudrate):
     else:
         print("Unsupported platform")
         sys.exit(1)
-    
 
 
 # Configure the serial port

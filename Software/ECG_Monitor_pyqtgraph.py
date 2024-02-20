@@ -1,47 +1,56 @@
 import sys
 import time
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import (QWidget, QSlider, QLineEdit, QLabel, QPushButton, QScrollArea, QApplication,
+                             QHBoxLayout, QVBoxLayout, QMainWindow, QSizePolicy, QToolBar)
+from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5 import QtGui
 from numpy_ringbuffer import RingBuffer
 import numpy as np
 import pyqtgraph as pg
 import serial
 import qdarktheme
 
-class App(QtWidgets.QMainWindow):
+class App(QMainWindow):
     def __init__(self, num_plots, parent=None):
         super(App, self).__init__(parent)
 
         self.setWindowTitle("BSPM Monitor")  # Set the window title
 
         # Create Gui Elements
-        self.mainbox = QtWidgets.QWidget()
+        self.mainbox = QWidget()
         self.setCentralWidget(self.mainbox)
-        self.mainbox.setLayout(QtWidgets.QVBoxLayout())
+        self.layout = QVBoxLayout(self.mainbox)
 
-        # Scroll area
-        self.scroll = QtWidgets.QScrollArea()
-        self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOn)
+        # Scroll area widget
+        self.scroll = QScrollArea()
+        # self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        # self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setWidgetResizable(True)
-        self.mainbox.layout().addWidget(self.scroll)
+        self.layout.addWidget(self.scroll)
+        # self.scroll.setWidget(self.canvas)
+        # self.setCentralWidget(self.scroll)
 
         # graphicslayoutwidget for plotting
-        self.canvas = pg.GraphicsLayoutWidget()
-        self.canvas.setLayout(QtWidgets.QVBoxLayout())
-        self.mainbox.layout().addWidget(self.canvas)
+        # self.vbox = QVBoxLayout()
+        # self.canvas = pg.GraphicsLayoutWidget()
+        self.canvas = QWidget()
         self.scroll.setWidget(self.canvas)
+        # self.canvas.setLayout(self.vbox)
+        # self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Set size policy
+        self.canvas_layout = QVBoxLayout(self.canvas)
 
         # Create a widget for FPS counter and Pause button
-        self.controls_widget = QtWidgets.QWidget()
-        self.controls_widget.setLayout(QtWidgets.QHBoxLayout())
-        self.mainbox.layout().addWidget(self.controls_widget)
+        self.controls_widget = QWidget()
+        self.controls_widget.setLayout(QHBoxLayout())
+        self.layout.addWidget(self.controls_widget)
         self.controls_widget.setMaximumHeight(50)
-    
+
         # fps counter label widget
-        self.label = QtWidgets.QLabel()
+        self.label = QLabel()
         self.controls_widget.layout().addWidget(self.label)
 
         # Add pause button
-        self.pause_button = QtWidgets.QPushButton("Pause")
+        self.pause_button = QPushButton("Pause")
         self.pause_button.setMaximumWidth(80)  # Adjust button width
         self.pause_button.clicked.connect(self.toggle_update)
         self.controls_widget.layout().addWidget(self.pause_button)
@@ -68,13 +77,15 @@ class App(QtWidgets.QMainWindow):
         font.setPixelSize(10)
         for i in range(num_plots):
             color = cmap.map(i)
-            plot = self.canvas.addPlot(labels={"left": f"Plot {i+1}"})
+            plot = pg.PlotWidget()
             plot.setLabel("left", f"Plot {i+1}")
             plot.getAxis("bottom").setStyle(tickFont = font)
             plot.getAxis("left").setStyle(tickFont = font)
+            plot.setMinimumHeight(150)
             h = plot.plot(pen=color)
             self.plots.append(h)
-            self.canvas.nextRow()
+            self.canvas_layout.addWidget(plot)
+            # self.canvas.nextRow()
             
 
     def _update(self):
@@ -85,7 +96,7 @@ class App(QtWidgets.QMainWindow):
                 plot.setData(self.ydata)
 
             self.fps_counter()
-        QtCore.QTimer.singleShot(1, self._update)
+        QTimer.singleShot(10, self._update)
         self.counter += 1
 
     def toggle_update(self):
@@ -117,24 +128,38 @@ class App(QtWidgets.QMainWindow):
             print(f"Serial port error: {e}")
             return None
 
-    def connect_to_arduino(baudrate=115200):
-        arduino_ports = list(serial.tools.list_ports.comports())
-        for p in arduino_ports:
-            print(p[1])
-            if "XIAO" in p[1]:
-                arduino_port = p[0]
-                print("Connecting to Arduino on port:", arduino_port)
-                ser = serial.Serial(arduino_port, baudrate=baudrate, timeout=1)
-                return ser      
-        print("Couldn't find Arduino port.")
-        sys.exit(1)
+    def connect_to_board(baudrate):
+        board_ports = list(serial.tools.list_ports.comports())
+        if platform.system() == "Darwin":
+            for p in board_ports:
+                print(p[1])
+                if "XIAO" in p[1]:
+                    board_port = p[0]
+                    print("Connecting to board on port:", board_port)
+                    ser = serial.Serial(board_port, baudrate, timeout=1)
+                    return ser
+            print("Couldn't find board port.")
+            sys.exit(1)
+        elif platform.system() == "Windows":
+            for p in board_ports:
+                print(p[2])
+                if "2886" in p[2]:
+                    board_port = p[0]
+                    print("Connecting to board on port:", board_port)
+                    ser = serial.Serial(board_port, baudrate, timeout=1)
+                    return ser
+            print("Couldn't find board port.")
+            sys.exit(1)
+        else:
+            print("Unsupported platform")
+            sys.exit(1)
 
 
 if __name__ == '__main__':
 
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     qdarktheme.setup_theme("auto")
-    num_plots = 5
+    num_plots = 32
     ecg_app = App(num_plots)
 
     ecg_app.show()
