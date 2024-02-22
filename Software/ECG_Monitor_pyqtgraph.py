@@ -77,8 +77,8 @@ class App(QMainWindow):
             plot.getAxis("bottom").setStyle(tickFont=font)
             plot.getAxis("left").setStyle(tickFont=font)
             plot.setMinimumHeight(120)
-            h = plot.plot(pen=color)
-            self.plots.append((h, plot))  # Store both the plot and the curve handle
+            curve = plot.plot(pen=color)
+            self.plots.append((curve, plot))  # Store both the plot and the curve handle
             self.canvas_layout.addWidget(plot)
 
     def _update(self):
