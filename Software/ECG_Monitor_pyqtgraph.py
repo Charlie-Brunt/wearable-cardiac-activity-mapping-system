@@ -35,6 +35,7 @@ class App(QMainWindow):
         self.canvas = QWidget()
         self.scroll.setWidget(self.canvas)
         self.canvas_layout = QVBoxLayout(self.canvas)
+        self.canvas_layout.setSpacing(0)
 
         # Create a widget for controls
         self.controls_widget = QWidget()
@@ -75,7 +76,7 @@ class App(QMainWindow):
             plot.setLabel("left", f"Plot {i+1}")
             plot.getAxis("bottom").setStyle(tickFont=font)
             plot.getAxis("left").setStyle(tickFont=font)
-            plot.setMinimumHeight(80)
+            plot.setMinimumHeight(120)
             h = plot.plot(pen=color)
             self.plots.append((h, plot))  # Store both the plot and the curve handle
             self.canvas_layout.addWidget(plot)
@@ -154,7 +155,7 @@ class App(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    num_plots = 1000
+    num_plots = 16
     ecg_app = App(num_plots)
     ecg_app.show()
     sys.exit(app.exec_())
