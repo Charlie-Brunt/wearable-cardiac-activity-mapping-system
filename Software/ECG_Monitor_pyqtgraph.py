@@ -3,17 +3,27 @@ import time
 import platform
 import serial
 from PyQt5.QtWidgets import (
-    QWidget, QSlider, QLineEdit, QLabel, QPushButton, QScrollArea, QApplication,
-    QHBoxLayout, QVBoxLayout, QMainWindow, QSizePolicy, QToolBar
+    QWidget, QLabel, QPushButton, QScrollArea, QApplication,
+    QHBoxLayout, QVBoxLayout, QMainWindow
 )
-from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtCore import QTimer
 from PyQt5 import QtGui
 import numpy as np
 import pyqtgraph as pg
-from numpy_ringbuffer import RingBuffer
 
 class App(QMainWindow):
+    """
+    Main application class for BSPM Monitor.
+    """
+
     def __init__(self, num_plots, parent=None):
+        """
+        Constructor for App class.
+
+        Args:
+            num_plots (int): Number of plots to display.
+            parent: Parent widget.
+        """
         super(App, self).__init__(parent)
 
         # Initialize the application window
@@ -21,6 +31,12 @@ class App(QMainWindow):
         self.setupUi(num_plots)
 
     def setupUi(self, num_plots):
+        """
+        Setup user interface.
+
+        Args:
+            num_plots (int): Number of plots to display.
+        """
         # Create the main layout
         self.mainbox = QWidget()
         self.setCentralWidget(self.mainbox)
@@ -66,6 +82,12 @@ class App(QMainWindow):
         self.showMaximized()
 
     def create_plots(self, num_plots):
+        """
+        Create plot widgets.
+
+        Args:
+            num_plots (int): Number of plots to create.
+        """
         self.plots = []
         cmap = pg.ColorMap([0, num_plots-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])
         font = QtGui.QFont()
@@ -82,6 +104,9 @@ class App(QMainWindow):
             self.canvas_layout.addWidget(plot)
 
     def _update(self):
+        """
+        Update plots and FPS counter.
+        """
         if self.update_enabled:
             self.ydata = np.sin(self.x/3.+ self.counter/9.)
             for curve, plot in self.plots:
@@ -92,17 +117,31 @@ class App(QMainWindow):
         self.counter += 1
 
     def is_plot_visible(self, plot):
-        """Check if the plot is visible in the scroll area."""
+        """
+        Check if the plot is visible in the scroll area.
+
+        Args:
+            plot: Plot widget to check.
+
+        Returns:
+            bool: True if the plot is visible, False otherwise.
+        """
         scroll_pos = self.scroll.verticalScrollBar().value()
         plot_pos = plot.pos().y()
         return scroll_pos - plot.height() < plot_pos < scroll_pos + self.scroll.viewport().height()
 
     def toggle_update(self):
+        """
+        Toggle update of plots.
+        """
         new_label = "Resume" if self.update_enabled else "Pause"
         self.update_enabled = not self.update_enabled
         self.pause_button.setText(new_label)
 
     def fps_counter(self):
+        """
+        Calculate and update FPS counter label.
+        """
         now = time.time()
         dt = (now - self.lastupdate)
         if dt <= 0:
@@ -114,19 +153,39 @@ class App(QMainWindow):
         self.label.setText(tx)
 
     def read_from_com_port(self, port, baudrate=115200, timeout=None):
-            try:
-                ser = connect_to_board(baudrate)
-                if ser.isOpen():
-                    data = ser.read_all().decode('utf-8')
-                    return data
-                else:
-                    print("Could not open serial port.")
-                    return None
-            except serial.SerialException as e:
-                print(f"Serial port error: {e}")
-                return None
+        """
+        Read data from a COM port.
 
-    def connect_to_board(baudrate):
+        Args:
+            port (str): COM port name.
+            baudrate (int): Baudrate of the COM port.
+            timeout: Timeout value.
+
+        Returns:
+            str: Data read from the COM port.
+        """
+        try:
+            ser = self.connect_to_board(baudrate)
+            if ser.isOpen():
+                data = ser.read_all().decode('utf-8')
+                return data
+            else:
+                print("Could not open serial port.")
+                return None
+        except serial.SerialException as e:
+            print(f"Serial port error: {e}")
+            return None
+
+    def connect_to_board(self, baudrate):
+        """
+        Connect to the board.
+
+        Args:
+            baudrate (int): Baudrate for serial communication.
+
+        Returns:
+            serial.Serial: Serial object for communication with the board.
+        """
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
@@ -151,7 +210,6 @@ class App(QMainWindow):
         else:
             print("Unsupported platform")
             sys.exit(1)
-
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
