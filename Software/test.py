@@ -25,19 +25,28 @@ class App(QMainWindow):
             channels (int): Number of plots to display.
             parent: Parent widget.
         """
-        super(App, self).__init__()
+        super(App, self).__init__(parent)
 
         # Initialise critical parameters and variables
         self.sampling_frequency = 200 # Hz
-        self.buffer_size = 2*self.sampling_frequency # 2 second window
+        self.buffer_size = 2 * self.sampling_frequency # 2 second window
         self.buffer = bytearray(self.buffer_size)
         self.channels = channels
 
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
+        self.show()
+        self.console.append("Initialising...")
 
         # Connect to board
+        QTimer.singleShot(1000, self.delayed_init)
+    
+    def delayed_init(self):
+        """
+        Delayed initialisation after the window is shown.
+        """
+        self.console.append("Connecting to board...")
         self.ser = self.connect_to_board(115200)
 
     def setupUi(self):
@@ -85,6 +94,8 @@ class App(QMainWindow):
         # Create a console widget
         self.console = QTextEdit()
         self.console.setReadOnly(True)
+        font = QtGui.QFont("Courier", 10)
+        self.console.setFont(font)
         self.controls_layout.addWidget(self.console)
         self.console.setMaximumWidth(500)
 
@@ -157,15 +168,20 @@ class App(QMainWindow):
         """
         Toggle update of plots.
         """
-        if not self.started_monitoring:
-            self.update_enabled = True
-            self.started_monitoring = True
-            new_label = "Pause"
-            self.pause_button.setText(new_label)
+        if not self.ser: # Remove not later
+            if not self.started_monitoring:
+                self.update_enabled = True
+                self.started_monitoring = True
+                new_label = "Pause"
+                self.pause_button.setText(new_label)
+                self.console.append("Monitoring started.")
+            else:
+                self.update_enabled = not self.update_enabled
+                new_label = "Resume" if not self.update_enabled else "Pause"
+                self.pause_button.setText(new_label)
+                self.console.append("Monitoring paused." if not self.update_enabled else "Monitoring resumed.")
         else:
-            self.update_enabled = not self.update_enabled
-            new_label = "Resume" if not self.update_enabled else "Pause"
-            self.pause_button.setText(new_label)
+            self.console.append("Not connected to board.")
 
     def toggle_record(self):
         """
@@ -252,6 +268,5 @@ class App(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     channels = 5
-    ecg_app = App(channels)
-    ecg_app.show()
+    ecgapp = App(channels)
     sys.exit(app.exec_())

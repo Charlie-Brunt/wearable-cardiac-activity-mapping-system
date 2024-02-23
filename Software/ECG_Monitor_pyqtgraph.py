@@ -5,7 +5,7 @@ import serial
 import serial.tools.list_ports
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QPushButton, QScrollArea, QApplication,
-    QHBoxLayout, QVBoxLayout, QMainWindow
+    QHBoxLayout, QVBoxLayout, QMainWindow, QTextEdit
 )
 from PyQt5.QtCore import QTimer
 from PyQt5 import QtGui
@@ -25,20 +25,29 @@ class App(QMainWindow):
             channels (int): Number of plots to display.
             parent: Parent widget.
         """
-        super(App, self).__init__()
+        super(App, self).__init__(parent)
 
         # Initialise critical parameters and variables
         self.sampling_frequency = 200 # Hz
-        self.buffer_size = 2*self.sampling_frequency # 2 second window
+        self.buffer_size = 2 * self.sampling_frequency # 2 second window
         self.buffer = bytearray(self.buffer_size)
         self.channels = channels
-
-        # Connect to board
-        self.ser = self.connect_to_board(115200)
 
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
+        self.show()
+        self.console.append("Initialising...")
+
+        # Connect to board
+        QTimer.singleShot(1000, self.delayed_init)
+    
+    def delayed_init(self):
+        """
+        Delayed initialisation after the window is shown.
+        """
+        self.console.append("Searching for board...")
+        self.ser = self.connect_to_board(115200)
 
     def setupUi(self):
         """
@@ -50,30 +59,6 @@ class App(QMainWindow):
         self.setCentralWidget(self.mainbox)
         self.layout = QVBoxLayout(self.mainbox)
         self.layout.setSpacing(0)
-
-         # Create a widget for controls
-        self.controls_widget = QWidget()
-        self.controls_widget.setLayout(QHBoxLayout())
-        self.layout.addWidget(self.controls_widget)
-        self.controls_widget.setMaximumHeight(40)
-
-        # Create a widget for console output
-
-        # Add FPS counter label
-        self.label = QLabel()
-        self.controls_widget.layout().addWidget(self.label)
-
-        # Add record to CSV button
-        self.record_button = QPushButton("Record to CSV")
-        self.record_button.setMaximumWidth(120)
-        self.record_button.clicked.connect(self.toggle_record)
-        self.controls_widget.layout().addWidget(self.record_button)
-
-        # Add pause button
-        self.pause_button = QPushButton("Start Monitoring")
-        self.pause_button.setMaximumWidth(120)
-        self.pause_button.clicked.connect(self.toggle_update)
-        self.controls_widget.layout().addWidget(self.pause_button)
 
         # Create a scroll area widget for plots
         self.scroll = QScrollArea()
@@ -99,6 +84,44 @@ class App(QMainWindow):
         self.create_plots()
         self._update()
         self.showMaximized()
+
+        # Create a widget for controls
+        self.controls_widget = QWidget()
+        self.controls_layout = QHBoxLayout(self.controls_widget)
+        self.layout.addWidget(self.controls_widget)
+        self.controls_widget.setMaximumHeight(70)
+
+        # Create a console widget
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        font = QtGui.QFont("Courier", 10)
+        self.console.setFont(font)
+        self.controls_layout.addWidget(self.console)
+        self.console.setMaximumWidth(500)
+
+        # Add record to CSV button
+        self.record_button = QPushButton("Record to CSV")
+        self.record_button.setMaximumWidth(120)
+        self.record_button.clicked.connect(self.toggle_record)
+        self.controls_layout.addWidget(self.record_button)
+
+        # Add a save as png button
+        self.save_button = QPushButton("Save as PNG")
+        self.save_button.setMaximumWidth(120)
+        self.save_button.clicked.connect(self.save_as_png)
+        self.controls_layout.addWidget(self.save_button)
+        self.save_button.setEnabled(False)
+
+
+        # Add pause button
+        self.pause_button = QPushButton("Start Monitoring")
+        self.pause_button.setMaximumWidth(120)
+        self.pause_button.clicked.connect(self.toggle_update)
+        self.controls_layout.addWidget(self.pause_button)
+
+        # Add FPS counter label
+        self.label = QLabel()
+        self.controls_layout.addWidget(self.label)
 
     def create_plots(self):
         """
@@ -153,15 +176,24 @@ class App(QMainWindow):
         """
         Toggle update of plots.
         """
-        if not self.started_monitoring:
-            self.update_enabled = True
-            self.started_monitoring = True
-            new_label = "Pause"
-            self.pause_button.setText(new_label)
+        if not self.ser: # Remove not later
+            if not self.started_monitoring:
+                self.update_enabled = True
+                self.started_monitoring = True
+                new_label = "Pause"
+                self.pause_button.setText(new_label)
+                self.console.append("Monitoring started.")
+            else:
+                self.update_enabled = not self.update_enabled
+                new_label = "Resume" if not self.update_enabled else "Pause"
+                self.pause_button.setText(new_label)
+                self.console.append("Monitoring paused." if not self.update_enabled else "Monitoring resumed.")
+                if self.update_enabled:
+                    self.save_button.setEnabled(False)
+                else:
+                    self.save_button.setEnabled(True)
         else:
-            self.update_enabled = not self.update_enabled
-            new_label = "Resume" if not self.update_enabled else "Pause"
-            self.pause_button.setText(new_label)
+            self.console.append("Not connected to board.")
 
     def toggle_record(self):
         """
@@ -170,6 +202,15 @@ class App(QMainWindow):
         self.recording_active = not self.recording_active
         new_label = "Save recording" if self.recording_active else "Record to CSV"
         self.record_button.setText(new_label)
+
+    def save_as_png(self):
+        """
+        Save the plot as a PNG file.
+        """
+        filename = str(time.time()) + ".png"
+        if filename:
+            self.canvas.grab().save(filename)
+            self.console.append(f"Plot saved as {filename}.")
 
     def fps_counter(self):
         """
@@ -182,7 +223,7 @@ class App(QMainWindow):
         fps2 = 1.0 / dt
         self.lastupdate = now
         self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = 'Frame Rate:  {fps:.1f} FPS'.format(fps=self.fps)
+        tx = '{fps:.1f} FPS'.format(fps=self.fps)
         self.label.setText(tx)
 
     def read_from_com_port(self, baudrate=115200):
@@ -226,28 +267,27 @@ class App(QMainWindow):
                 print(p[1])
                 if "XIAO" in p[1]:
                     board_port = p[0]
-                    print("Connecting to board on port:", board_port)
+                    self.console.append("Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            print("Couldn't find board port.")
-            sys.exit(1)
+            self.console.append("Couldn't find board.")
+            # sys.exit(1)
         elif platform.system() == "Windows":
             for p in board_ports:
                 print(p[2])
                 if "2886" in p[2]:
                     board_port = p[0]
-                    print("Connecting to board on port:", board_port)
+                    self.console.append("Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            print("Couldn't find board port.")
-            sys.exit(1)
+            self.console.append("Couldn't find board port.")
+            # sys.exit(1)
         else:
-            print("Unsupported platform")
-            sys.exit(1)
+            self.console.append("Unsupported platform")
+            # sys.exit(1)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     channels = 5
-    ecg_app = App(channels)
-    ecg_app.show()
+    ecgapp = App(channels)
     sys.exit(app.exec_())
