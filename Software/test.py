@@ -33,12 +33,12 @@ class App(QMainWindow):
         self.buffer = bytearray(self.buffer_size)
         self.channels = channels
 
-        # Connect to board
-        self.ser = self.connect_to_board(115200)
-
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
+
+        # Connect to board
+        self.ser = self.connect_to_board(115200)
 
     def setupUi(self):
         """
@@ -50,28 +50,6 @@ class App(QMainWindow):
         self.setCentralWidget(self.mainbox)
         self.layout = QVBoxLayout(self.mainbox)
         self.layout.setSpacing(0)
-
-         # Create a widget for controls
-        self.controls_widget = QWidget()
-        self.controls_widget.setLayout(QHBoxLayout())
-        self.layout.addWidget(self.controls_widget)
-        self.controls_widget.setMaximumHeight(40)
-
-        # Add FPS counter label
-        self.label = QLabel()
-        self.controls_widget.layout().addWidget(self.label)
-
-        # Add record to CSV button
-        self.record_button = QPushButton("Record to CSV")
-        self.record_button.setMaximumWidth(120)
-        self.record_button.clicked.connect(self.toggle_record)
-        self.controls_widget.layout().addWidget(self.record_button)
-
-        # Add pause button
-        self.pause_button = QPushButton("Start Monitoring")
-        self.pause_button.setMaximumWidth(120)
-        self.pause_button.clicked.connect(self.toggle_update)
-        self.controls_widget.layout().addWidget(self.pause_button)
 
         # Create a scroll area widget for plots
         self.scroll = QScrollArea()
@@ -98,10 +76,33 @@ class App(QMainWindow):
         self._update()
         self.showMaximized()
 
+        # Create a widget for controls
+        self.controls_widget = QWidget()
+        self.controls_layout = QHBoxLayout(self.controls_widget)
+        self.layout.addWidget(self.controls_widget)
+        self.controls_widget.setMaximumHeight(70)
+
         # Create a console widget
         self.console = QTextEdit()
         self.console.setReadOnly(True)
-        self.layout.addWidget(self.console)
+        self.controls_layout.addWidget(self.console)
+        self.console.setMaximumWidth(500)
+
+        # Add record to CSV button
+        self.record_button = QPushButton("Record to CSV")
+        self.record_button.setMaximumWidth(120)
+        self.record_button.clicked.connect(self.toggle_record)
+        self.controls_layout.addWidget(self.record_button)
+
+        # Add pause button
+        self.pause_button = QPushButton("Start Monitoring")
+        self.pause_button.setMaximumWidth(120)
+        self.pause_button.clicked.connect(self.toggle_update)
+        self.controls_layout.addWidget(self.pause_button)
+
+        # Add FPS counter label
+        self.label = QLabel()
+        self.controls_layout.addWidget(self.label)
 
     def create_plots(self):
         """
@@ -185,7 +186,7 @@ class App(QMainWindow):
         fps2 = 1.0 / dt
         self.lastupdate = now
         self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = 'Frame Rate:  {fps:.1f} FPS'.format(fps=self.fps)
+        tx = '{fps:.1f} FPS'.format(fps=self.fps)
         self.label.setText(tx)
 
     def read_from_com_port(self, baudrate=115200):
@@ -229,24 +230,24 @@ class App(QMainWindow):
                 print(p[1])
                 if "XIAO" in p[1]:
                     board_port = p[0]
-                    print("Connecting to board on port:", board_port)
+                    self.console.append("Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            print("Couldn't find board port.")
-            sys.exit(1)
+            self.console.append("Couldn't find board.")
+            # sys.exit(1)
         elif platform.system() == "Windows":
             for p in board_ports:
                 print(p[2])
                 if "2886" in p[2]:
                     board_port = p[0]
-                    print("Connecting to board on port:", board_port)
+                    self.console.append("Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            print("Couldn't find board port.")
-            sys.exit(1)
+            self.console.append("Couldn't find board port.")
+            # sys.exit(1)
         else:
-            print("Unsupported platform")
-            sys.exit(1)
+            self.console.append("Unsupported platform")
+            # sys.exit(1)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
