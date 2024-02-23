@@ -2,6 +2,7 @@ import sys
 import time
 import platform
 import serial
+import serial.tools.list_ports
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QPushButton, QScrollArea, QApplication,
     QHBoxLayout, QVBoxLayout, QMainWindow
@@ -16,31 +17,63 @@ class App(QMainWindow):
     Main application class for BSPM Monitor.
     """
 
-    def __init__(self, num_plots, parent=None):
+    def __init__(self, channels: int, parent=None):
         """
         Constructor for App class.
 
         Args:
-            num_plots (int): Number of plots to display.
+            channels (int): Number of plots to display.
             parent: Parent widget.
         """
-        super(App, self).__init__(parent)
+        super(App, self).__init__()
 
-        # Initialize the application window
+        # Initialise critical parameters and variables
+        self.sampling_frequency = 200 # Hz
+        self.buffer_size = 2*self.sampling_frequency # 2 second window
+        self.buffer = bytearray(self.buffer_size)
+        self.channels = channels
+
+        # Connect to board
+        self.ser = self.connect_to_board(115200)
+
+        # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
-        self.setupUi(num_plots)
+        self.setupUi()
 
-    def setupUi(self, num_plots):
+    def setupUi(self):
         """
         Setup user interface.
 
-        Args:
-            num_plots (int): Number of plots to display.
         """
         # Create the main layout
         self.mainbox = QWidget()
         self.setCentralWidget(self.mainbox)
         self.layout = QVBoxLayout(self.mainbox)
+        self.layout.setSpacing(0)
+
+         # Create a widget for controls
+        self.controls_widget = QWidget()
+        self.controls_widget.setLayout(QHBoxLayout())
+        self.layout.addWidget(self.controls_widget)
+        self.controls_widget.setMaximumHeight(40)
+
+        # Create a widget for console output
+
+        # Add FPS counter label
+        self.label = QLabel()
+        self.controls_widget.layout().addWidget(self.label)
+
+        # Add record to CSV button
+        self.record_button = QPushButton("Record to CSV")
+        self.record_button.setMaximumWidth(120)
+        self.record_button.clicked.connect(self.toggle_record)
+        self.controls_widget.layout().addWidget(self.record_button)
+
+        # Add pause button
+        self.pause_button = QPushButton("Start Monitoring")
+        self.pause_button.setMaximumWidth(120)
+        self.pause_button.clicked.connect(self.toggle_update)
+        self.controls_widget.layout().addWidget(self.pause_button)
 
         # Create a scroll area widget for plots
         self.scroll = QScrollArea()
@@ -52,47 +85,33 @@ class App(QMainWindow):
         self.scroll.setWidget(self.canvas)
         self.canvas_layout = QVBoxLayout(self.canvas)
         self.canvas_layout.setSpacing(0)
-
-        # Create a widget for controls
-        self.controls_widget = QWidget()
-        self.controls_widget.setLayout(QHBoxLayout())
-        self.layout.addWidget(self.controls_widget)
-        self.controls_widget.setMaximumHeight(50)
-
-        # Add FPS counter label
-        self.label = QLabel()
-        self.controls_widget.layout().addWidget(self.label)
-
-        # Add pause button
-        self.pause_button = QPushButton("Pause")
-        self.pause_button.setMaximumWidth(80)
-        self.pause_button.clicked.connect(self.toggle_update)
-        self.controls_widget.layout().addWidget(self.pause_button)
-
+        
         # Initialize data variables
-        self.x = np.linspace(0, 50., num=128)
+        self.x = np.linspace(0, 50., num=self.buffer_size)
         self.counter = 0
         self.fps = 0.
         self.lastupdate = time.time()
-        self.update_enabled = True
+        self.started_monitoring = False
+        self.update_enabled = False
+        self.recording_active = False
 
         # Create plots
-        self.create_plots(num_plots)
+        self.create_plots()
         self._update()
         self.showMaximized()
 
-    def create_plots(self, num_plots):
+    def create_plots(self):
         """
         Create plot widgets.
 
         Args:
-            num_plots (int): Number of plots to create.
+            channels (int): Number of plots to create.
         """
         self.plots = []
-        cmap = pg.ColorMap([0, num_plots-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])
+        cmap = pg.ColorMap([0, self.channels-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])
         font = QtGui.QFont()
         font.setPixelSize(10)
-        for i in range(num_plots):
+        for i in range(self.channels):
             color = cmap.map(i)
             plot = pg.PlotWidget()
             plot.setLabel("left", f"Plot {i+1}")
@@ -134,9 +153,23 @@ class App(QMainWindow):
         """
         Toggle update of plots.
         """
-        new_label = "Resume" if self.update_enabled else "Pause"
-        self.update_enabled = not self.update_enabled
-        self.pause_button.setText(new_label)
+        if not self.started_monitoring:
+            self.update_enabled = True
+            self.started_monitoring = True
+            new_label = "Pause"
+            self.pause_button.setText(new_label)
+        else:
+            self.update_enabled = not self.update_enabled
+            new_label = "Resume" if not self.update_enabled else "Pause"
+            self.pause_button.setText(new_label)
+
+    def toggle_record(self):
+        """
+        Toggle recording to CSV file.
+        """
+        self.recording_active = not self.recording_active
+        new_label = "Save recording" if self.recording_active else "Record to CSV"
+        self.record_button.setText(new_label)
 
     def fps_counter(self):
         """
@@ -152,7 +185,7 @@ class App(QMainWindow):
         tx = 'Frame Rate:  {fps:.1f} FPS'.format(fps=self.fps)
         self.label.setText(tx)
 
-    def read_from_com_port(self, port, baudrate=115200, timeout=None):
+    def read_from_com_port(self, baudrate=115200):
         """
         Read data from a COM port.
 
@@ -167,7 +200,8 @@ class App(QMainWindow):
         try:
             ser = self.connect_to_board(baudrate)
             if ser.isOpen():
-                data = ser.read_all().decode('utf-8')
+                buffer_size = 128
+                data = ser.read(self.buffer_size)
                 return data
             else:
                 print("Could not open serial port.")
@@ -213,7 +247,7 @@ class App(QMainWindow):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    num_plots = 16
-    ecg_app = App(num_plots)
+    channels = 5
+    ecg_app = App(channels)
     ecg_app.show()
     sys.exit(app.exec_())
