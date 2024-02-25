@@ -5,10 +5,11 @@ import serial
 import serial.tools.list_ports
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QPushButton, QScrollArea, QApplication,
-    QHBoxLayout, QVBoxLayout, QMainWindow, QTextEdit
+    QHBoxLayout, QVBoxLayout, QMainWindow, QTextEdit, QStatusBar, QSizePolicy
 )
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, QTime, Qt
 from PyQt5 import QtGui
+from datetime import datetime
 import numpy as np
 import pyqtgraph as pg
 
@@ -37,7 +38,7 @@ class App(QMainWindow):
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
         self.show()
-        self.console.append("Initialising...")
+        self.console.append(self.get_timestamp() + "Initialising...")
 
         # Connect to board
         QTimer.singleShot(1000, self.delayed_init)
@@ -46,7 +47,7 @@ class App(QMainWindow):
         """
         Delayed initialisation after the window is shown.
         """
-        self.console.append("Searching for board...")
+        self.console.append(self.get_timestamp() + "Searching for board...")
         self.ser = self.connect_to_board(115200)
 
     def setupUi(self):
@@ -91,14 +92,6 @@ class App(QMainWindow):
         self.layout.addWidget(self.controls_widget)
         self.controls_widget.setMaximumHeight(70)
 
-        # Create a console widget
-        self.console = QTextEdit()
-        self.console.setReadOnly(True)
-        font = QtGui.QFont("Courier", 10)
-        self.console.setFont(font)
-        self.controls_layout.addWidget(self.console)
-        self.console.setMaximumWidth(500)
-
         # Add record to CSV button
         self.record_button = QPushButton("Record to CSV")
         self.record_button.setMaximumWidth(120)
@@ -112,16 +105,41 @@ class App(QMainWindow):
         self.controls_layout.addWidget(self.save_button)
         self.save_button.setEnabled(False)
 
-
         # Add pause button
         self.pause_button = QPushButton("Start Monitoring")
         self.pause_button.setMaximumWidth(120)
         self.pause_button.clicked.connect(self.toggle_update)
         self.controls_layout.addWidget(self.pause_button)
 
+        # Create a console widget
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        font = QtGui.QFont("Courier New", 10)
+        self.console.setFont(font)
+        self.controls_layout.addWidget(self.console)
+        self.console.setMaximumWidth(500)
+
+        # Create a widget for the clock
+        self.clock = QLabel()
+        self.controls_layout.addWidget(self.clock)
+        self.clock_timer = QTimer(self)
+        self.clock_timer.timeout.connect(self.update_clock)
+        self.clock_timer.start(1000)  # Update every second
+        self.update_clock()
+
+        # Create a status bar
+        self.statusBar = QStatusBar()
+        self.setStatusBar(self.statusBar)
+        # spacer = QWidget()
+        # spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        # self.statusBar.addWidget(spacer)
+        
         # Add FPS counter label
-        self.label = QLabel()
-        self.controls_layout.addWidget(self.label)
+        self.fps_label = QLabel()
+        self.fps_label.setText("Frame Rate: 0 FPS")
+        self.controls_layout.addWidget(self.fps_label)
+        # self.statusBar.addWidget(self.fps_label)
+        self.fps_label.setAlignment(Qt.AlignRight)
 
     def create_plots(self):
         """
@@ -137,7 +155,7 @@ class App(QMainWindow):
         for i in range(self.channels):
             color = cmap.map(i)
             plot = pg.PlotWidget()
-            plot.setLabel("left", f"Plot {i+1}")
+            plot.setLabel("left", f"Channel {i+1}")
             plot.getAxis("bottom").setStyle(tickFont=font)
             plot.getAxis("left").setStyle(tickFont=font)
             plot.setMinimumHeight(120)
@@ -182,18 +200,18 @@ class App(QMainWindow):
                 self.started_monitoring = True
                 new_label = "Pause"
                 self.pause_button.setText(new_label)
-                self.console.append("Monitoring started.")
+                self.console.append(self.get_timestamp() + "Monitoring started")
             else:
                 self.update_enabled = not self.update_enabled
                 new_label = "Resume" if not self.update_enabled else "Pause"
                 self.pause_button.setText(new_label)
-                self.console.append("Monitoring paused." if not self.update_enabled else "Monitoring resumed.")
+                self.console.append(self.get_timestamp() + ("Monitoring paused" if not self.update_enabled else "Monitoring resumed"))
                 if self.update_enabled:
                     self.save_button.setEnabled(False)
                 else:
                     self.save_button.setEnabled(True)
         else:
-            self.console.append("Not connected to board.")
+            self.console.append(self.get_timestamp() + "Not connected to board")
 
     def toggle_record(self):
         """
@@ -207,10 +225,11 @@ class App(QMainWindow):
         """
         Save the plot as a PNG file.
         """
-        filename = str(time.time()) + ".png"
+        datetime = self.datetime_filename()
+        filename = datetime + ".png"
         if filename:
-            self.canvas.grab().save(filename)
-            self.console.append(f"Plot saved as {filename}.")
+            self.canvas.grab().save("Pictures/"+filename)
+            self.console.append(self.get_timestamp() + f"Plot saved as {filename}")
 
     def fps_counter(self):
         """
@@ -223,8 +242,8 @@ class App(QMainWindow):
         fps2 = 1.0 / dt
         self.lastupdate = now
         self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = '{fps:.1f} FPS'.format(fps=self.fps)
-        self.label.setText(tx)
+        tx = 'Frame Rate: {fps:.1f} FPS'.format(fps=self.fps)
+        self.fps_label.setText(tx)
 
     def read_from_com_port(self, baudrate=115200):
         """
@@ -264,27 +283,63 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                print(p[1])
+                # print(p[1])
                 if "XIAO" in p[1]:
                     board_port = p[0]
-                    self.console.append("Connecting to board on port:", board_port)
+                    self.console.append(self.get_timestamp() + "Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            self.console.append("Couldn't find board.")
+            self.console.append(self.get_timestamp() + "Couldn't find board")
             # sys.exit(1)
         elif platform.system() == "Windows":
             for p in board_ports:
-                print(p[2])
+                # print(p[2])
                 if "2886" in p[2]:
                     board_port = p[0]
-                    self.console.append("Connecting to board on port:", board_port)
+                    self.console.append(self.get_timestamp() + "Connecting to board on port:", board_port)
                     ser = serial.Serial(board_port, baudrate, timeout=1)
                     return ser
-            self.console.append("Couldn't find board port.")
+            self.console.append(self.get_timestamp() + "Couldn't find board port")
             # sys.exit(1)
         else:
-            self.console.append("Unsupported platform")
+            self.console.append(self.get_timestamp() + "Unsupported platform")
             # sys.exit(1)
+    def datetime_filename(self):
+        """
+        Return the current date and time as a string.
+
+        Returns:
+            str: The current date and time formatted as a string.
+        """
+        # Get the current date and time
+        current_datetime = datetime.now()
+        
+        # Format the date and time as a string
+        datetime_string = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+        
+        return datetime_string
+
+    def get_timestamp(self):
+        """
+        Get the current date and time as a string.
+
+        Returns:
+            str: The current date and time formatted as a string.
+        """
+        return datetime.now().strftime("%H:%M:%S") + " "
+
+    def update_clock(self):
+        """
+        Update the clock with the current time.
+        """
+        # Get the current time
+        current_time = QTime.currentTime()
+
+        # Format the time as a string
+        time_string = current_time.toString("hh:mm:ss")
+
+        # Display the time on the clock LCD
+        self.clock.setText(time_string)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
