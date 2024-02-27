@@ -15,6 +15,8 @@ from numpy_ringbuffer import RingBuffer
 import numpy as np
 import pyqtgraph as pg
 import pandas as pd
+import qdarkstyle
+
 
 class SerialThread(QThread):
     """
@@ -93,6 +95,7 @@ class App(QMainWindow):
         self.update_size = self.buffer_size//100 # sets fps
         self.channels = channels
         self.baudrate = 115200
+        self.calls = 0 # fps counter variable
 
         # Create a ring buffers for data storag
         self.buffers = [RingBuffer(capacity=self.buffer_size, dtype=np.uint8) for _ in range(self.channels)]
@@ -103,7 +106,7 @@ class App(QMainWindow):
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
-        self.show()
+        self.showMaximized()
         self.console.append(self.get_timestamp() + "Initialising...")
 
         # Connect to board
@@ -131,7 +134,7 @@ class App(QMainWindow):
         # Create the main layout
         self.mainbox = QWidget()
         self.setCentralWidget(self.mainbox)
-        self.layout = QVBoxLayout(self.mainbox)
+        self.layout = QHBoxLayout(self.mainbox)
         self.layout.setSpacing(0)
 
         # Create a scroll area widget for plots
@@ -156,13 +159,13 @@ class App(QMainWindow):
 
         # Create plots, schedule first update
         self.create_plots()
-        self.showMaximized()
 
         # Create a widget for controls
         self.controls_widget = QWidget()
-        self.controls_layout = QHBoxLayout(self.controls_widget)
+        self.controls_layout = QVBoxLayout(self.controls_widget)
         self.layout.addWidget(self.controls_widget)
-        self.controls_widget.setMaximumHeight(100)
+        self.controls_widget.setMaximumWidth(400)
+        self.controls_layout.setAlignment(Qt.AlignTop)
 
         # Create a console widget
         self.console = QTextEdit()
@@ -170,41 +173,39 @@ class App(QMainWindow):
         font = QtGui.QFont("Courier New", 10)
         self.console.setFont(font)
         self.controls_layout.addWidget(self.console)
-        self.console.setMaximumWidth(400)
+        # self.console.setMaximumHeight(700)
 
-        # Add record to CSV button
-        self.record_button = QPushButton("Record to CSV")
-        self.record_button.setMaximumWidth(120)
-        self.record_button.clicked.connect(self.toggle_record)
-        self.controls_layout.addWidget(self.record_button)
-
-        # Add a save as png button
-        self.save_button = QPushButton("Save as PNG")
-        self.save_button.setMaximumWidth(120)
-        self.save_button.clicked.connect(self.save_as_png)
-        self.controls_layout.addWidget(self.save_button)
-        self.save_button.setEnabled(False)
+        # Create button widgets
+        self.buttons_widget = QWidget()
+        self.buttons_layout = QHBoxLayout(self.buttons_widget)
+        self.controls_layout.addWidget(self.buttons_widget)
+        self.buttons_layout.setAlignment(Qt.AlignTop)
 
         # Add pause button
         self.pause_button = QPushButton("Start Monitoring")
         self.pause_button.setMaximumWidth(120)
         self.pause_button.clicked.connect(self.toggle_update)
-        self.controls_layout.addWidget(self.pause_button)
+        self.buttons_layout.addWidget(self.pause_button)
 
-        # Create a widget for the clock
-        self.clock = QLabel()
-        self.controls_layout.addWidget(self.clock)
-        self.clock_timer = QTimer(self)
-        self.clock_timer.timeout.connect(self.update_clock)
-        self.clock_timer.start(1000)  # Update every second
-        self.update_clock()
-        self.clock.setAlignment(Qt.AlignCenter)
+        # Add a save as png button
+        self.save_button = QPushButton("Save as PNG")
+        self.save_button.setMaximumWidth(120)
+        self.save_button.clicked.connect(self.save_as_png)
+        self.buttons_layout.addWidget(self.save_button)
+        self.save_button.setEnabled(False)
 
-        # Add FPS counter label
-        self.fps_label = QLabel()
-        self.fps_label.setText("Frame Rate: 0 FPS")
-        self.controls_layout.addWidget(self.fps_label)
-        self.fps_label.setAlignment(Qt.AlignCenter)
+        # Add record to CSV button
+        self.record_button = QPushButton("Record to CSV")
+        self.record_button.setMaximumWidth(120)
+        self.record_button.clicked.connect(self.toggle_record)
+        self.buttons_layout.addWidget(self.record_button)
+
+        # Info Box
+        self.info_label = QLabel()
+        self.info_label.setAlignment(Qt.AlignBottom | Qt.AlignCenter)
+        self.controls_layout.addWidget(self.info_label)
+        self.update_info_box()
+
 
     def create_plots(self):
         """
@@ -239,6 +240,7 @@ class App(QMainWindow):
             if self.recording_active:
                 pass
             self.fps_counter()
+        self.update_info_box()
 
 
     def demo_update(self):
@@ -327,7 +329,6 @@ class App(QMainWindow):
             self.console.append(self.get_timestamp() + f"Data saved as {filename}")
     
 
-
     def save_as_png(self):
         """
         Save the plot as a PNG file.
@@ -347,15 +348,14 @@ class App(QMainWindow):
         """
         Calculate and update FPS counter label.
         """
+        self.calls += 1
         now = time.time()
-        dt = (now - self.lastupdate)
-        if dt <= 0:
-            dt = 0.000000000001
-        fps2 = 1.0 / dt
-        self.lastupdate = now
-        self.fps = self.fps * 0.9 + fps2 * 0.1
-        tx = 'Frame Rate: {fps:.1f} FPS'.format(fps=self.fps)
-        self.fps_label.setText(tx)
+        if self.calls >= 50:
+            self.calls = 0
+            dt = (now - self.lastupdate)
+            self.fps = 50 / dt
+            self.lastupdate = now
+        tx = 'Frame Rate: {fps:.0f} FPS'.format(fps=self.fps)
 
     def connect_to_board(self):
         """
@@ -392,6 +392,14 @@ class App(QMainWindow):
             self.console.append(self.get_timestamp() + "Unsupported platform")
             # sys.exit(1)
 
+    def update_info_box(self):
+        current_time = datetime.now().strftime("%H:%M:%S")
+        fps_info = f"FPS: {self.fps:.0f}"
+        channels_info = f"Channels: {self.channels}"
+        sampling_rate_info = f"Sampling Rate: {self.sampling_rate} Hz"
+        info_text = f"{current_time} | {fps_info} | {channels_info} | {sampling_rate_info}"
+        self.info_label.setText(info_text)
+
     def get_timestamp(self):
         """
         Get the current date and time as a string.
@@ -401,21 +409,10 @@ class App(QMainWindow):
         """
         return datetime.now().strftime("%H:%M:%S") + " "
 
-    def update_clock(self):
-        """
-        Update the clock with the current time.
-        """
-        # Get the current time
-        current_time = QTime.currentTime()
-
-        # Format the time as a string
-        time_string = current_time.toString("hh:mm:ss")
-
-        # Display the time on the clock LCD
-        self.clock.setText(time_string)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
     channels = 32
     ecgapp = App(channels, demo_mode=False)
     sys.exit(app.exec_())
