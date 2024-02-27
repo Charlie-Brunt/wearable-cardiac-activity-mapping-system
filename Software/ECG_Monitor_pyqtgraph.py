@@ -97,6 +97,9 @@ class App(QMainWindow):
         # Create a ring buffers for data storag
         self.buffers = [RingBuffer(capacity=self.buffer_size, dtype=np.uint8) for _ in range(self.channels)]
 
+        # Set up dataframe for recording
+        self.datafame = pd.DataFrame()
+
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
         self.setupUi()
@@ -236,7 +239,7 @@ class App(QMainWindow):
             if self.recording_active:
                 pass
             self.fps_counter()
-                # self.save_to_csv()
+
 
     def demo_update(self):
         """
@@ -304,8 +307,26 @@ class App(QMainWindow):
         new_label = "Save recording" if self.recording_active else "Record to CSV"
         self.record_button.setText(new_label)
         self.console.append(self.get_timestamp() + ("Recording started" if self.recording_active else "Recording stopped"))
-        if self.recording_active:
-            
+
+    def save_to_csv(self, dataframe):
+        """
+        Save data to a CSV file.
+
+        Args:
+            dataframe (pd.DataFrame): Data to save to the CSV file.
+        """
+        # Get the current date and time
+        current_datetime = datetime.now()
+        
+        # Format the date and time as a string
+        datetime_string = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+
+        filename = datetime_string + ".csv"
+        if filename:
+            dataframe.to_csv("Data/"+filename, index=False)
+            self.console.append(self.get_timestamp() + f"Data saved as {filename}")
+    
+
 
     def save_as_png(self):
         """
