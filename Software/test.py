@@ -304,7 +304,6 @@ class App(QMainWindow):
         new_label = "Save recording" if self.recording_active else "Record to CSV"
         self.record_button.setText(new_label)
         self.console.append(self.get_timestamp() + ("Recording started" if self.recording_active else "Recording stopped"))
-        if self.recording_active:
             
 
     def save_as_png(self):

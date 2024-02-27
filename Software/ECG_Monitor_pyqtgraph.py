@@ -24,26 +24,26 @@ class SerialThread(QThread):
     """
     data_received = pyqtSignal(np.ndarray)
 
-    def __init__(self, ser, buffers, update_size, channels, parent=None):
+    def __init__(self, ser, buffers, channels, parent=None):
         super(SerialThread, self).__init__(parent)
         self.ser = ser
         self.buffers = buffers
-        self.update_size = update_size
         self.running = True
+        self.count = 0
 
     def run(self):
         while self.running:
+            self.count += 1
             data = self.receive_data()
-            if data is not None:
-
-                for i in range(len(self.buffers)):
-                    try:
-                        self.buffers[i].extend([data[i]])
-                        
-                    except:
-                        pass
-            to_send = np.array([np.array(buffer) for buffer in self.buffers])
-            self.data_received.emit(to_send)
+            for i in range(len(self.buffers)):
+                try:
+                    self.buffers[i].extend([data[i]])
+                except:
+                    pass
+            if self.count == 1: # set fps
+                self.count = 0
+                to_send = np.array([np.array(buffer) for buffer in self.buffers])
+                self.data_received.emit(to_send)
             # time.sleep(0.01)
 
     def receive_data(self):
@@ -92,7 +92,6 @@ class App(QMainWindow):
         # Initialise parameters for data acquisition
         self.sampling_rate = 200 # Hz
         self.buffer_size = 2 * self.sampling_rate # 2 second window
-        self.update_size = self.buffer_size//100 # sets fps
         self.channels = channels
         self.baudrate = 115200
         self.calls = 0 # fps counter variable
@@ -101,7 +100,7 @@ class App(QMainWindow):
         self.buffers = [RingBuffer(capacity=self.buffer_size, dtype=np.uint8) for _ in range(self.channels)]
 
         # Set up dataframe for recording
-        self.datafame = pd.DataFrame()
+        self.dataframe = pd.DataFrame(columns=['Timestamp'] + [f'Channel_{i+1}' for i in range(self.channels)])
 
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
@@ -123,7 +122,7 @@ class App(QMainWindow):
         Delayed initialisation after the window is shown.
         """
         self.ser = self.connect_to_board()
-        self.serial_thread = SerialThread(self.ser, self.buffers, self.update_size, self.channels)
+        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels)
         self.serial_thread.data_received.connect(self.update_plots)
 
     def setupUi(self):
@@ -149,13 +148,14 @@ class App(QMainWindow):
         self.canvas_layout.setSpacing(0)
         
         # Initialize data variables
-        self.x = np.linspace(0, 50., num=self.buffer_size)
+        self.x = np.linspace(0, self.buffer_size/self.sampling_rate, num=self.buffer_size)
         self.counter = 0
         self.fps = 0.
         self.lastupdate = time.time()
         self.started_monitoring = False
         self.update_enabled = False
         self.recording_active = False
+        self.render_override = False
 
         # Create plots, schedule first update
         self.create_plots()
@@ -199,13 +199,13 @@ class App(QMainWindow):
         self.record_button.setMaximumWidth(120)
         self.record_button.clicked.connect(self.toggle_record)
         self.buttons_layout.addWidget(self.record_button)
+        self.record_button.setEnabled(False)
 
         # Info Box
         self.info_label = QLabel()
         self.info_label.setAlignment(Qt.AlignBottom | Qt.AlignCenter)
         self.controls_layout.addWidget(self.info_label)
         self.update_info_box()
-
 
     def create_plots(self):
         """
@@ -226,7 +226,7 @@ class App(QMainWindow):
             plot.getAxis("left").setStyle(tickFont=font)
             plot.setMinimumHeight(120)
             plot.setYRange(0, 255)
-            plot.setXRange(0, self.buffer_size)
+            plot.setXRange(0, self.buffer_size/self.sampling_rate)
             curve = plot.plot(pen=color)
             self.plots.append((curve, plot))  # Store both the plot and the curve handle
             self.canvas_layout.addWidget(plot)
@@ -236,12 +236,18 @@ class App(QMainWindow):
             for i, (curve, plot) in enumerate(self.plots):
                 if self.is_plot_visible(plot):
                     # data = data - np.average(data)
-                    curve.setData(data[i])
-            if self.recording_active:
-                pass
+                    curve.setData(self.x[:len(data[i])], data[i])
             self.fps_counter()
+        elif self.render_override:
+            for i, (curve, plot) in enumerate(self.plots):
+                curve.setData(self.x[:len(data[i])], data[i])
+            self.render_override = False
+        if self.recording_active:
+            timestamp = self.get_csv_timestamp()
+            data_with_timestamp = [timestamp] + [channel_data[-1] for channel_data in data]
+            new_row = pd.Series(data_with_timestamp, index=self.dataframe.columns)
+            self.dataframe = self.dataframe._append(new_row, ignore_index=True)
         self.update_info_box()
-
 
     def demo_update(self):
         """
@@ -251,7 +257,7 @@ class App(QMainWindow):
             self.ydata = (np.sin(self.x/3.+ self.counter/9.) + 1) * 127.5
             for curve, plot in self.plots:
                 if self.is_plot_visible(plot):
-                    curve.setData(self.ydata)
+                    curve.setData(self.x, self.ydata)
             self.counter += 1
         self.fps_counter()
         QTimer.singleShot(10, self.demo_update)
@@ -266,6 +272,8 @@ class App(QMainWindow):
         Returns:
             bool: True if the plot is visible, False otherwise.
         """
+        if not self.update_enabled:
+            return True
         scroll_pos = self.scroll.verticalScrollBar().value()
         plot_pos = plot.pos().y()
         return scroll_pos - plot.height() < plot_pos < scroll_pos + self.scroll.viewport().height()
@@ -283,6 +291,7 @@ class App(QMainWindow):
                 self.console.append(self.get_timestamp() + "Monitoring started")
             elif self.ser:
                 self.started_monitoring = True
+                self.record_button.setEnabled(True)
                 self.update_enabled = True
                 new_label = "Pause"
                 self.pause_button.setText(new_label)
@@ -299,6 +308,7 @@ class App(QMainWindow):
             if self.update_enabled:
                 self.save_button.setEnabled(False)
             else:
+                self.render_override = True
                 self.save_button.setEnabled(True)
 
     def toggle_record(self):
@@ -309,6 +319,10 @@ class App(QMainWindow):
         new_label = "Save recording" if self.recording_active else "Record to CSV"
         self.record_button.setText(new_label)
         self.console.append(self.get_timestamp() + ("Recording started" if self.recording_active else "Recording stopped"))
+        if not self.recording_active:
+            self.save_to_csv(self.dataframe)
+            self.dataframe = pd.DataFrame(columns=['Timestamp'] + [f'Channel_{i+1}' for i in range(self.channels)])
+
 
     def save_to_csv(self, dataframe):
         """
@@ -327,7 +341,6 @@ class App(QMainWindow):
         if filename:
             dataframe.to_csv("Data/"+filename, index=False)
             self.console.append(self.get_timestamp() + f"Data saved as {filename}")
-    
 
     def save_as_png(self):
         """
@@ -408,6 +421,15 @@ class App(QMainWindow):
             str: The current date and time formatted as a string.
         """
         return datetime.now().strftime("%H:%M:%S") + " "
+
+    def get_csv_timestamp(self):
+        """
+        Get the current date and time as a string for use in CSV files.
+
+        Returns:
+            str: The current date and time formatted as a string for use in CSV files.
+        """
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 if __name__ == '__main__':
