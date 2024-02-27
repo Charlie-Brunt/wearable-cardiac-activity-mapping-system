@@ -16,16 +16,16 @@ import numpy as np
 import pyqtgraph as pg
 import pandas as pd
 
-class SerialThread(QThread):
+class DataThread(QThread):
     """
-    Thread for reading data from the serial port.
+    Thread for receiving data from the COM port and updating the ring buffer.
     """
-    data_received = pyqtSignal(np.ndarray)
+    data_updated = pyqtSignal(np.ndarray)
 
-    def __init__(self, ser, buffers, update_size, channels, parent=None):
-        super(SerialThread, self).__init__(parent)
+    def __init__(self, ser, buffer, update_size, parent=None):
+        super(DataThread, self).__init__(parent)
         self.ser = ser
-        self.buffers = buffers
+        self.buffer = buffer
         self.update_size = update_size
         self.running = True
 
@@ -33,16 +33,9 @@ class SerialThread(QThread):
         while self.running:
             data = self.receive_data()
             if data is not None:
-
-                for i in range(len(self.buffers)):
-                    try:
-                        self.buffers[i].extend([data[i]])
-                        
-                    except:
-                        pass
-            to_send = np.array([np.array(buffer) for buffer in self.buffers])
-            self.data_received.emit(to_send)
-            # time.sleep(0.01)
+                self.buffer.extend(data)
+                self.data_updated.emit(np.array(self.buffer))
+            time.sleep(0.01)  # Adjust sleep time as needed
 
     def receive_data(self):
         """
@@ -53,17 +46,15 @@ class SerialThread(QThread):
         """
         try:
             if self.ser.isOpen():
-                bytes = self.ser.readline().strip()
-                # print(bytes)
+                bytes = self.ser.read(self.update_size)
                 decoded_data = np.frombuffer(bytes, dtype=np.int8)
-                # print(decoded_data)
                 return decoded_data
             else:
                 print("Could not open serial port.")
                 return None
         except serial.SerialException as e:
             print(f"Serial port error: {e}")
-            sys.exit(1)
+            return None
 
     def stop(self):
         self.running = False
@@ -90,12 +81,10 @@ class App(QMainWindow):
         # Initialise parameters for data acquisition
         self.sampling_rate = 200 # Hz
         self.buffer_size = 2 * self.sampling_rate # 2 second window
-        self.update_size = self.buffer_size//100 # sets fps
+        self.buffer = RingBuffer(capacity=self.buffer_size, dtype=np.uint8)
+        self.update_size = self.buffer_size//50
         self.channels = channels
         self.baudrate = 115200
-
-        # Create a ring buffers for data storag
-        self.buffers = [RingBuffer(capacity=self.buffer_size, dtype=np.uint8) for _ in range(self.channels)]
 
         # Initialise the application window
         self.setWindowTitle("BSPM Monitor")  # Set the window title
@@ -107,23 +96,20 @@ class App(QMainWindow):
         if not demo_mode:
             self.console.append(self.get_timestamp() + "Searching for board...")
             QTimer.singleShot(1000, self.delayed_init)
-        else:
-            self.console.append(self.get_timestamp() + "Demo mode")
-            self.demo_update()
-            
     
     def delayed_init(self):
         """
         Delayed initialisation after the window is shown.
         """
         self.ser = self.connect_to_board()
-        self.serial_thread = SerialThread(self.ser, self.buffers, self.update_size, self.channels)
-        self.serial_thread.data_received.connect(self.update_plots)
+        if not self.demo_mode and self.ser:
+            self.data_thread = DataThread(self.ser, self.buffer, self.update_size)
+            self.data_thread.data_updated.connect(self.update_plot)
+            self.data_thread.start()
 
     def setupUi(self):
         """
         Setup user interface.
-
         """
         # Create the main layout
         self.mainbox = QWidget()
@@ -153,6 +139,7 @@ class App(QMainWindow):
 
         # Create plots, schedule first update
         self.create_plots()
+        self._update()
         self.showMaximized()
 
         # Create a widget for controls
@@ -206,9 +193,6 @@ class App(QMainWindow):
     def create_plots(self):
         """
         Create plot widgets.
-
-        Args:
-            channels (int): Number of plots to create.
         """
         self.plots = []
         cmap = pg.ColorMap([0, self.channels-1], [pg.mkColor('#729ece'), pg.mkColor('#ff9e4a')])
@@ -221,42 +205,28 @@ class App(QMainWindow):
             plot.getAxis("bottom").setStyle(tickFont=font)
             plot.getAxis("left").setStyle(tickFont=font)
             plot.setMinimumHeight(120)
-            plot.setYRange(0, 255)
-            plot.setXRange(0, self.buffer_size)
             curve = plot.plot(pen=color)
             self.plots.append((curve, plot))  # Store both the plot and the curve handle
             self.canvas_layout.addWidget(plot)
 
-    def update_plots(self, data):
-        if self.update_enabled:
-            for i, (curve, plot) in enumerate(self.plots):
-                if self.is_plot_visible(plot):
-                    # data = data - np.average(data)
-                    curve.setData(data[i])
-            if self.recording_active:
-                pass
-            self.fps_counter()
-                # self.save_to_csv()
-
-    def demo_update(self):
+    def _update(self):
         """
         Update plots and FPS counter.
         """
         if self.update_enabled:
-            self.ydata = (np.sin(self.x/3.+ self.counter/9.) + 1) * 127.5
-            for curve, plot in self.plots:
-                if self.is_plot_visible(plot):
-                    curve.setData(self.ydata)
-            self.counter += 1
-        self.fps_counter()
-        QTimer.singleShot(10, self.demo_update)
+            if self.demo_mode:
+                self.ydata = np.sin(self.x/3.+ self.counter/9.)
+                for curve, plot in self.plots:
+                    if self.is_plot_visible(plot):
+                        curve.setData(self.ydata)
+                self.counter += 1
+            # self.fps_counter()
+        QTimer.singleShot(10, self._update)
+        
 
     def is_plot_visible(self, plot):
         """
         Check if the plot is visible in the scroll area.
-
-        Args:
-            plot: Plot widget to check.
 
         Returns:
             bool: True if the plot is visible, False otherwise.
@@ -282,7 +252,6 @@ class App(QMainWindow):
                 new_label = "Pause"
                 self.pause_button.setText(new_label)
                 self.console.append(self.get_timestamp() + "Monitoring started")
-                self.serial_thread.start()
             else:
                 self.console.append(self.get_timestamp() + "Attempting to connect to board...")
                 QTimer.singleShot(1000, self.delayed_init)
@@ -303,20 +272,13 @@ class App(QMainWindow):
         self.recording_active = not self.recording_active
         new_label = "Save recording" if self.recording_active else "Record to CSV"
         self.record_button.setText(new_label)
-        self.console.append(self.get_timestamp() + ("Recording started" if self.recording_active else "Recording stopped"))
-        if self.recording_active:
-            
 
     def save_as_png(self):
         """
         Save the plot as a PNG file.
         """
-        # Get the current date and time
         current_datetime = datetime.now()
-        
-        # Format the date and time as a string
         datetime_string = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
-
         filename = datetime_string + ".png"
         if filename:
             self.canvas.grab().save("Pictures/"+filename)
@@ -336,12 +298,29 @@ class App(QMainWindow):
         tx = 'Frame Rate: {fps:.1f} FPS'.format(fps=self.fps)
         self.fps_label.setText(tx)
 
+    def update_clock(self):
+        """
+        Update the clock with the current time.
+        """
+        current_time = QTime.currentTime()
+        time_string = current_time.toString("hh:mm:ss")
+        self.clock.setText(time_string)
+
+    def update_plot(self, data):
+        """
+        Update plot with new data.
+
+        Args:
+            data (np.ndarray): New data to update the plot.
+        """
+        for curve, plot in self.plots:
+            if self.is_plot_visible(plot):
+                curve.setData(data)
+        self.fps_counter()
+
     def connect_to_board(self):
         """
         Connect to the board.
-
-        Args:
-            baudrate (int): Baudrate for serial communication.
 
         Returns:
             serial.Serial: Serial object for communication with the board.
@@ -349,27 +328,22 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                # print(p[1])
                 if "XIAO" in p[1]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
                     ser = serial.Serial(board_port, self.baudrate, timeout=1)
                     return ser
             self.console.append(self.get_timestamp() + "Couldn't find board")
-            # sys.exit(1)
         elif platform.system() == "Windows":
             for p in board_ports:
-                # print(p[2])
                 if "2886" in p[2]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
                     ser = serial.Serial(board_port, self.baudrate, timeout=1)
                     return ser
             self.console.append(self.get_timestamp() + "Couldn't find board port")
-            # sys.exit(1)
         else:
             self.console.append(self.get_timestamp() + "Unsupported platform")
-            # sys.exit(1)
 
     def get_timestamp(self):
         """
@@ -380,21 +354,8 @@ class App(QMainWindow):
         """
         return datetime.now().strftime("%H:%M:%S") + " "
 
-    def update_clock(self):
-        """
-        Update the clock with the current time.
-        """
-        # Get the current time
-        current_time = QTime.currentTime()
-
-        # Format the time as a string
-        time_string = current_time.toString("hh:mm:ss")
-
-        # Display the time on the clock LCD
-        self.clock.setText(time_string)
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    channels = 32
+    channels = 1
     ecgapp = App(channels, demo_mode=False)
     sys.exit(app.exec_())

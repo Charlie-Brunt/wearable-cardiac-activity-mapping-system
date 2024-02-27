@@ -41,15 +41,16 @@ buffer = bytearray(buffer_size)
 # Read and store the data in the buffer
 while True:
     # Read data from the serial port, blocks until 
-    data = port.read(buffer_size)
+    data = port.readline().strip()
     
     # Store the data in the buffer
-    buffer[:len(data)] = data
+    # buffer[:len(data)] = data
     
     # Process the received data
     # ...
-    decoded_buffer = list(buffer)
+    decoded_buffer = list(data)
 
 
     # Print the received data
     print(decoded_buffer)
+    time.sleep(0.01)
