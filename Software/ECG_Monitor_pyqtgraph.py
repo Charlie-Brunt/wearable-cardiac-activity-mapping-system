@@ -244,7 +244,7 @@ class App(QMainWindow):
             timestamp = self.get_csv_timestamp()
             data_with_timestamp = [timestamp] + [channel_data[-1] for channel_data in data]
             new_row = pd.Series(data_with_timestamp, index=self.dataframe.columns)
-            self.dataframe = self.dataframe.append(new_row, ignore_index=True)
+            self.dataframe = self.dataframe._append(new_row, ignore_index=True)
         self.update_info_box()
 
     def demo_update(self):
@@ -387,6 +387,6 @@ class App(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    channels = 32
+    channels = 5
     ecgapp = App(channels, demo_mode=False)
     sys.exit(app.exec_())
