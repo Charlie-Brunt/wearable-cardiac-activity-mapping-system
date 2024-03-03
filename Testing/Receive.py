@@ -32,7 +32,7 @@ def connect_to_board(baudrate):
 
 
 # Configure the serial port
-port = connect_to_board(115200)
+port = connect_to_board(1000000)
 
 # Create a buffer to store the received data
 buffer_size = 128
