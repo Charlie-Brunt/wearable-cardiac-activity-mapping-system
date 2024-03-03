@@ -85,7 +85,7 @@ class App(QMainWindow):
     Main application class for BSPM Monitor.
     """
 
-    def __init__(self, channels: int, parent=None, demo_mode=False):
+    def __init__(self, channels: int, baudrate=115200, demo_mode=False):
         """
         Constructor for App class.
 
@@ -94,16 +94,16 @@ class App(QMainWindow):
             parent: Parent widget.
             demo_mode (bool): Flag indicating whether the application is in demo mode.
         """
-        super(App, self).__init__(parent)
+        super(App, self).__init__()
 
         # Test mode
         self.demo_mode = demo_mode
 
         # Initialise parameters for data acquisition
-        self.sampling_rate = 200  # Hz
+        self.sampling_rate = 250  # Hz
         self.buffer_size = 2 * self.sampling_rate  # 2 second window
         self.channels = channels
-        self.baudrate = 115200
+        self.baudrate = baudrate
         self.calls = 0  # fps counter variable
 
         # Create ring buffers for data storage
@@ -244,7 +244,7 @@ class App(QMainWindow):
             timestamp = self.get_csv_timestamp()
             data_with_timestamp = [timestamp] + [channel_data[-1] for channel_data in data]
             new_row = pd.Series(data_with_timestamp, index=self.dataframe.columns)
-            self.dataframe = self.dataframe.append(new_row, ignore_index=True)
+            self.dataframe = self.dataframe._append(new_row, ignore_index=True)
         self.update_info_box()
 
     def demo_update(self):
@@ -352,17 +352,21 @@ class App(QMainWindow):
                 if "XIAO" in p[1]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
+                    self.pause_button.setText("Start Monitoring")
                     ser = serial.Serial(board_port, self.baudrate, timeout=1)
                     return ser
             self.console.append(self.get_timestamp() + "Couldn't find board")
+            self.pause_button.setText("Connect to Board")
         elif platform.system() == "Windows":
             for p in board_ports:
                 if "2886" in p[2]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
+                    self.pause_button.setText("Start Monitoring")
                     ser = serial.Serial(board_port, self.baudrate, timeout=1)
                     return ser
             self.console.append(self.get_timestamp() + "Couldn't find board port")
+            self.pause_button.setText("Connect to Board")
         else:
             self.console.append(self.get_timestamp() + "Unsupported platform")
 
@@ -387,6 +391,5 @@ class App(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    channels = 32
-    ecgapp = App(channels, demo_mode=False)
+    ecgapp = App(channels=5, baudrate=1000000, demo_mode=False)
     sys.exit(app.exec_())

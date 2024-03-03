@@ -32,7 +32,7 @@ def connect_to_board(baudrate):
 
 
 # Configure the serial port
-port = connect_to_board(115200)
+port = connect_to_board(1000000)
 
 # Create a buffer to store the received data
 buffer_size = 128
@@ -41,7 +41,7 @@ buffer = bytearray(buffer_size)
 # Read and store the data in the buffer
 while True:
     # Read data from the serial port, blocks until 
-    data = port.readline().strip()
+    data = port.read(buffer_size)
     
     # Store the data in the buffer
     # buffer[:len(data)] = data
