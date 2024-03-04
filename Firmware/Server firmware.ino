@@ -1,10 +1,12 @@
 #include <bluefruit.h>
 
-/* Best result is 
- *  - 8.74 KB/s with 20 ms, MTU = 23
- *  - 23.62 KB/s with 7.5 ms, MTU = 23
- *  - 47.85 KB/s with 15 ms, MTU = 247 
- */
+unsigned short value;
+int wave_frequency = 2; // Hz
+int sampling_freq = 200; // Hz
+unsigned long previousMillis = 0;
+unsigned int timerDelay = 1000/sampling_freq; // ms
+unsigned long previousTx = 0;
+
 
 // data to send in the throughput test
 char test_data[256] = { 0 };

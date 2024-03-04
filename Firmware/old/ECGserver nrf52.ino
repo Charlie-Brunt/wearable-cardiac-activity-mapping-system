@@ -17,8 +17,9 @@ int wave_frequency = 2; // Hz
 int sampling_freq = 200; // Hz
 unsigned long previousMillis = 0;
 unsigned int timerDelay = 1000/sampling_freq; // ms
+unsigned long previousTx = 0;
 
-const int bufferSize = 122;  // Adjust the buffer size as needed
+const int bufferSize = 243;  // Adjust the buffer size as needed 243
 unsigned short valueBuffer[bufferSize];
 int bufferIndex = 0;
 
@@ -87,6 +88,7 @@ void updateValue()
 }
 
 void sendBufferOverBLE() {
+  long currentTx = millis(); 
   // Create a buffer to hold the entire data
   byte dataBuffer[bufferSize * sizeof(unsigned short)];
 
@@ -95,5 +97,6 @@ void sendBufferOverBLE() {
 
   // // Transmit the entire buffer over BLE
   testDataChar.writeValue(dataBuffer, bufferSize * sizeof(unsigned short));
-  Serial.println(millis());
+  Serial.println((bufferSize*1000)/(currentTx - previousTx));
+  previousTx = currentTx;
 }
