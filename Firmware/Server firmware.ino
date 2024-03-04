@@ -1,26 +1,32 @@
 #include <bluefruit.h>
+#include <math.h>
+#include <cstring>
 
-unsigned short value;
-int wave_frequency = 2; // Hz
-int sampling_freq = 200; // Hz
-unsigned long previousMillis = 0;
-unsigned int timerDelay = 1000/sampling_freq; // ms
+// Parameters
+const int frequency = 2; // Hz
+const int sampling_frequency = 250; // Hz
+const int bit_depth = 8;
+int levels = pow(2, bit_depth) - 1;
+int channels = 5;
+
+// Timing
 unsigned long previousTx = 0;
-
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
+const long interval = 1000/sampling_frequency;
 
 // data to send in the throughput test
-char test_data[256] = { 0 };
+double reading;
+const int bufferSize = 240;  // Adjust the buffer size as needed 243
+uint8_t valueBuffer[bufferSize];
+int bufferIndex = 0;
 
-// Number of packet to sent
-// actualy number of bytes depends on the MTU of the connection
-#define PACKET_NUM    1000
+// Create a buffer to hold the entire data
+byte dataBuffer[bufferSize];
 
-BLEDis bledis;
-BLEUart bleuart;
-
-uint32_t rxCount = 0;
-uint32_t rxStartTime = 0;
-uint32_t rxLastTime = 0;
+BLEDis bledis; // Device Information Service
+BLEUart bleuart; // UART service
+BLEBas blebas;  // Battery Service
 
 /**************************************************************************/
 /*!
@@ -35,23 +41,27 @@ void setup(void)
 
   Serial.println("Bluefruit52 ECG");
   Serial.println("------------------------------\n");
-  Serial.println(test_data);
 
+  // Setup the BLE LED to be enabled on CONNECT
   Bluefruit.autoConnLed(true);
-  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);  
+  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
   Bluefruit.begin();
-  Bluefruit.setTxPower(8);    // Check bluefruit.h for supported values
+  Bluefruit.setTxPower(8); // set Tx Power to +8dB; Check bluefruit.h for supported values
   Bluefruit.Periph.setConnectCallback(connect_callback);
   Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
   Bluefruit.Periph.setConnInterval(6, 12); // 7.5 - 15 ms
 
+  // Configure and Start Device Information Service
   bledis.setManufacturer("Adafruit Industries");
   bledis.setModel("Bluefruit Feather52");
   bledis.begin();
 
+  // Configure and Start BLE Uart Service
   bleuart.begin();
-  bleuart.setRxCallback(bleuart_rx_callback);
-  bleuart.setNotifyCallback(bleuart_notify_callback);
+
+  // Configure and Start Battery Service
+  blebas.begin();
+  blebas.write(100); // (100% battery life)
 
   // Set up and start advertising
   startAdv();
@@ -79,6 +89,11 @@ void connect_callback(uint16_t conn_handle)
   BLEConnection* conn = Bluefruit.Connection(conn_handle);
   Serial.println("Connected");
 
+  char central_name[32] = { 0 };
+  conn->getPeerName(central_name, sizeof(central_name));
+  Serial.print("Connected to ");
+  Serial.println(central_name);
+
   // request PHY changed to 2MB
   Serial.println("Request to change PHY");
   conn->requestPHY();
@@ -94,7 +109,7 @@ void connect_callback(uint16_t conn_handle)
   // request connection interval of 7.5 ms
   // conn->requestConnectionParameter(6); // in unit of 1.25
 
-  // delay a bit for all the request to complete
+  // delay a bit for all the requests to complete
   delay(1000);
 }
 
@@ -112,81 +127,53 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
   Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
 }
 
-void bleuart_rx_callback(uint16_t conn_hdl)
-{
-  (void) conn_hdl;
-  
-  rxLastTime = millis();
-  
-  // first packet
-  if ( rxCount == 0 )
-  {
-    rxStartTime = millis();
-  }
-
-  uint32_t count = bleuart.available();
-
-  rxCount += count;
-  bleuart.flush(); // empty rx fifo
-
-  // Serial.printf("RX %d bytes\n", count);
-}
-
-void bleuart_notify_callback(uint16_t conn_hdl, bool enabled)
-{
-  if ( enabled )
-  {
-    Serial.println("Send a key and press enter to start test");
-  }
-}
-
-void print_speed(const char* text, uint32_t count, uint32_t ms)
-{
-  Serial.print(text);
-  Serial.print(count);
-  Serial.print(" bytes in ");
-  Serial.print(ms / 1000.0F, 2);
-  Serial.println(" seconds.");
-
-  Serial.print("Speed : ");
-  Serial.print( (count / 1000.0F) / (ms / 1000.0F), 2);
-  Serial.println(" KB/s.\r\n");  
-}
-
-void test_throughput(void)
-{
-  uint32_t start, sent;
-  start = sent = 0;
-
-  const uint16_t data_mtu = Bluefruit.Connection(0)->getMtu() - 3;
-  memset(test_data, '1', data_mtu);
-
-  uint32_t remaining = data_mtu*PACKET_NUM;
-
-  Serial.print("Sending ");
-  Serial.print(remaining);
-  Serial.println(" bytes ...");
-  Serial.flush();
-  delay(1);
-  // delay(2000);  
-
-  start = millis();
-  while ( (remaining > 0) && Bluefruit.connected() && bleuart.notifyEnabled() )
-  {
-    if ( !bleuart.write(test_data, data_mtu) ) break;
-
-    sent      += data_mtu;
-    remaining -= data_mtu;
-  }
-
-  print_speed("Sent ", sent, millis() - start);
-}
-
 void loop(void)
 {  
-  if (Bluefruit.connected() && bleuart.notifyEnabled())
+  if (Bluefruit.connected())
   {
-    
+    // Get a fresh ADC value when ready
+    updateReading();
+
+    if (bufferIndex >= bufferSize - 1) {
+      // Transmit the entire buffer over BLE
+
+      // int nonZeroCount = 0;
+      // for (int i = 0; i < bufferSize; i++) {
+      //   if (valueBuffer[i] != 0) {
+      //     nonZeroCount++;
+      //   }
+      // }
+      // Serial.println(nonZeroCount);
+      
+      sendBufferOverBLE();
+
+      // Reset buffer index
+      bufferIndex = 0;
     }
   }
+}
+
+void updateReading()
+{
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    // Save the last time the LED blinked
+    previousMillis = currentMillis;
+    for (int i = 0; i < channels; i++){
+      reading = (0.2*sin(2*M_PI*random(5)*frequency*millis()/1000)+0.8*sin(2*M_PI*random(3)*frequency*millis()/1000)+1.2*sin(2*M_PI*random(2)*frequency*millis()/1000))/3;
+      valueBuffer[bufferIndex] = map((reading+1)*levels/2, 0, levels, 0, levels);
+      bufferIndex++;
+    }
+  }
+}
+
+void sendBufferOverBLE() {
+  long currentTx = millis(); 
+  // Copy sensorBuffer to dataBuffer
+  memcpy(dataBuffer, valueBuffer, bufferSize);
+
+  // Transmit the entire buffer over BLE
+  bleuart.write(dataBuffer, bufferSize);
+  Serial.println((bufferSize*1000)/(currentTx - previousTx));
+  previousTx = currentTx;
 }

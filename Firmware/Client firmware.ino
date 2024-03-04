@@ -19,27 +19,33 @@
 #include <bluefruit.h>
 
 BLEClientUart clientUart; // bleuart client
-
-uint32_t rx_count = 0;
+BLEClientBas  clientBas;  // battery service client
+BLEClientDis  clientDis;  // device information service client
 
 void setup()
 {
   Serial.begin(115200);
   while ( !Serial ) delay(10);   // for nrf52840 with native usb
 
-  Serial.println("Bluefruit52 Central BLEUART Example");
+  Serial.println("Bluefruit52 Central ECG");
   Serial.println("-----------------------------------\n");
 
   // Config the connection with maximum bandwidth 
   // more SRAM required by SoftDevice
   // Note: All config***() function must be called before begin()
-  Bluefruit.configCentralBandwidth(BANDWIDTH_MAX);  
+  Bluefruit.configCentralBandwidth(BANDWIDTH_MAX); 
   
   // Initialize Bluefruit with maximum connections as Peripheral = 0, Central = 1
   // SRAM usage required by SoftDevice will increase dramatically with number of connections
   Bluefruit.begin(0, 1);
   
   Bluefruit.setName("Bluefruit52 Central");
+
+  // Init BLE Central Battery Service
+  clientBas.begin();
+
+  // Init BLE Central Device Information Service
+  clientDis.begin();
 
   // Init BLE Central Uart Serivce
   clientUart.begin();
@@ -94,6 +100,46 @@ void connect_callback(uint16_t conn_handle)
 {
   Serial.println("Connected");
 
+  Serial.print("Dicovering Device Information ... ");
+  if ( clientDis.discover(conn_handle) )
+  {
+    Serial.println("Found it");
+    char buffer[32+1];
+    
+    // read and print out Manufacturer
+    memset(buffer, 0, sizeof(buffer));
+    if ( clientDis.getManufacturer(buffer, sizeof(buffer)) )
+    {
+      Serial.print("Manufacturer: ");
+      Serial.println(buffer);
+    }
+
+    // read and print out Model Number
+    memset(buffer, 0, sizeof(buffer));
+    if ( clientDis.getModel(buffer, sizeof(buffer)) )
+    {
+      Serial.print("Model: ");
+      Serial.println(buffer);
+    }
+
+    Serial.println();
+  }else
+  {
+    Serial.println("Found NONE");
+  }
+
+  Serial.print("Dicovering Battery ... ");
+  if ( clientBas.discover(conn_handle) )
+  {
+    Serial.println("Found it");
+    Serial.print("Battery level: ");
+    Serial.print(clientBas.read());
+    Serial.println("%");
+  }else
+  {
+    Serial.println("Found NONE");
+  }
+
   Serial.print("Discovering BLE Uart Service ... ");
   if ( clientUart.discover(conn_handle) )
   {
@@ -129,12 +175,17 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
  * Callback invoked when uart received data
  * @param uart_svc Reference object to the service where the data 
  * arrived. In this example it is clientUart
- */ 
+ */
 void bleuart_rx_callback(BLEClientUart& uart_svc)
 {
-  int count = uart_svc.available();
-  (void)count;
-  uart_svc.flush();
+  Serial.print("[RX]: ");
+  
+  while ( uart_svc.available() )
+  {
+    Serial.print( (char) uart_svc.read() );
+  }
+
+  Serial.println();
 }
 
 void loop()
