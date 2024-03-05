@@ -1,33 +1,27 @@
-/*********************************************************************
- This is an example for our nRF52 based Bluefruit LE modules
-
- Pick one up today in the adafruit shop!
-
- Adafruit invests time and resources providing this open source code,
- please support Adafruit and open-source hardware by purchasing
- products from Adafruit!
-
- MIT license, check LICENSE for more information
- All text above, and the splash screen below must be included in
- any redistribution
-*********************************************************************/
-
-/*
- * This sketch demonstrate the central API(). A additional bluefruit
- * that has bleuart as peripheral is required for the demo.
- */
 #include <bluefruit.h>
+
+// Parameters
+const int frequency = 2; // Hz
+const int sampling_frequency = 250; // Hz
+const int bit_depth = 8;
+int levels = pow(2, bit_depth) - 1;
+int channels = 48;
 
 BLEClientUart clientUart; // bleuart client
 BLEClientBas  clientBas;  // battery service client
 BLEClientDis  clientDis;  // device information service client
+
+const int bufferSize = 240;
+uint8_t dataBuffer[bufferSize];
+unsigned long previousMillis = 0;
+unsigned long currentMillis = 0;
 
 void setup()
 {
   Serial.begin(115200);
   while ( !Serial ) delay(10);   // for nrf52840 with native usb
 
-  Serial.println("Bluefruit52 Central ECG");
+  Serial.println("Bluefruit52 ECG Client");
   Serial.println("-----------------------------------\n");
 
   // Config the connection with maximum bandwidth 
@@ -178,14 +172,20 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
  */
 void bleuart_rx_callback(BLEClientUart& uart_svc)
 {
-  Serial.print("[RX]: ");
-  
   while ( uart_svc.available() )
   {
-    Serial.print( (char) uart_svc.read() );
+    // currentMillis = millis();
+    uart_svc.read(dataBuffer, bufferSize);
+    for (int i = 0; i < bufferSize; i++) {
+        if (i % channels == 0) {
+          Serial.println();
+          delay(1000/sampling_frequency);
+        }
+      Serial.write(dataBuffer[i]);
+      }
+    // Serial.println((bufferSize*1000)/(currentMillis - previousMillis));
+    // previousMillis = currentMillis;
   }
-
-  Serial.println();
 }
 
 void loop()
@@ -195,17 +195,8 @@ void loop()
     // Not discovered yet
     if ( clientUart.discovered() )
     {
-      // Discovered means in working state
-      // Get Serial input and send to Peripheral
-      if ( Serial.available() )
-      {
-        delay(2); // delay a bit for all characters to arrive
-        
-        char str[20+1] = { 0 };
-        Serial.readBytes(str, 20);
-        
-        clientUart.print( str );
-      }
+
     }
+    
   }
 }

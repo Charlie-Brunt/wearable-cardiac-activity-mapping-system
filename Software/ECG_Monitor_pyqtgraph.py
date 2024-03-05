@@ -53,8 +53,11 @@ class SerialThread(QThread):
                     pass
             if self.count == 1:  # set fps
                 self.count = 0
-                to_send = np.array([np.array(buffer) for buffer in self.buffers])
-                self.data_received.emit(to_send)
+                try:
+                    to_send = np.array([np.array(buffer) for buffer in self.buffers])
+                    self.data_received.emit(to_send)
+                except:
+                    pass
 
     def receive_data(self):
         """
@@ -349,7 +352,7 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                if "XIAO" in p[1]:
+                if "XIAO" in p[1] and "1101" in p[0]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
                     self.pause_button.setText("Start Monitoring")
@@ -391,5 +394,5 @@ class App(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    ecgapp = App(channels=5, baudrate=1000000, demo_mode=False)
+    ecgapp = App(channels=48, baudrate=1000000, demo_mode=False)
     sys.exit(app.exec_())

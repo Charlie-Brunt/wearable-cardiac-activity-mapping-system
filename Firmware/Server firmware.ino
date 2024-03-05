@@ -7,7 +7,7 @@ const int frequency = 2; // Hz
 const int sampling_frequency = 250; // Hz
 const int bit_depth = 8;
 int levels = pow(2, bit_depth) - 1;
-int channels = 5;
+int channels = 48;
 
 // Timing
 unsigned long previousTx = 0;
@@ -37,9 +37,9 @@ BLEBas blebas;  // Battery Service
 void setup(void)
 {  
   Serial.begin(115200);
-  while ( !Serial ) delay(10);   // for nrf52840 with native usb
+  // while ( !Serial ) delay(10);   // for nrf52840 with native usb
 
-  Serial.println("Bluefruit52 ECG");
+  Serial.println("Bluefruit52 ECG Server");
   Serial.println("------------------------------\n");
 
   // Setup the BLE LED to be enabled on CONNECT
@@ -160,7 +160,9 @@ void updateReading()
     // Save the last time the LED blinked
     previousMillis = currentMillis;
     for (int i = 0; i < channels; i++){
-      reading = (0.2*sin(2*M_PI*random(5)*frequency*millis()/1000)+0.8*sin(2*M_PI*random(3)*frequency*millis()/1000)+1.2*sin(2*M_PI*random(2)*frequency*millis()/1000))/3;
+      reading = (0.2*sin(2*M_PI*4*frequency*millis()/1000)+0.8*sin(2*M_PI*3*frequency*millis()/1000)+1.2*sin(2*M_PI*1.8*frequency*millis()/1000))/3;
+      // reading = 0.5;
+      // reading = sin(2*M_PI*frequency*millis()/1000);
       valueBuffer[bufferIndex] = map((reading+1)*levels/2, 0, levels, 0, levels);
       bufferIndex++;
     }
