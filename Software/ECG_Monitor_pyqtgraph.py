@@ -134,6 +134,7 @@ class App(QMainWindow):
         self.ser = self.connect_to_board()
         self.serial_thread = SerialThread(self.ser, self.buffers, self.channels)
         self.serial_thread.data_received.connect(self.update_plots)
+        self.ser.write(channels.to_bytes(1, byteorder='big'))  # Tell the board how many channels to expect
 
     def setupUi(self):
         """Set up user interface."""
@@ -287,9 +288,10 @@ class App(QMainWindow):
                 self.pause_button.setText(new_label)
                 self.console.append(self.get_timestamp() + "Monitoring started")
             elif self.ser:
-                self.started_monitoring = True
+                self.ser.flushInput() # Clear the input buffer
+                self.started_monitoring = True # Start monitoring
                 self.record_button.setEnabled(True)
-                self.update_enabled = True
+                self.update_enabled = True # Start updating the plots
                 new_label = "Pause"
                 self.pause_button.setText(new_label)
                 self.console.append(self.get_timestamp() + "Monitoring started")

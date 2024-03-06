@@ -136,17 +136,7 @@ void loop(void)
 
     if (bufferIndex >= bufferSize - 1) {
       // Transmit the entire buffer over BLE
-
-      // int nonZeroCount = 0;
-      // for (int i = 0; i < bufferSize; i++) {
-      //   if (valueBuffer[i] != 0) {
-      //     nonZeroCount++;
-      //   }
-      // }
-      // Serial.println(nonZeroCount);
-      
       sendBufferOverBLE();
-
       // Reset buffer index
       bufferIndex = 0;
     }
