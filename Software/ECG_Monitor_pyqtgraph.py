@@ -156,7 +156,7 @@ class App(QMainWindow):
         self.canvas_layout.setSpacing(0)
 
         # Initialize data variables
-        self.x = np.linspace(0, self.buffer_size/self.sampling_rate, num=self.buffer_size)
+        self.x = np.linspace(-self.buffer_size/self.sampling_rate, 0, num=self.buffer_size)
         self.counter = 0
         self.fps = 0.
         self.lastupdate = time.time()
@@ -228,7 +228,7 @@ class App(QMainWindow):
             plot.getAxis("left").setStyle(tickFont=font)
             plot.setMinimumHeight(120)
             plot.setYRange(0, 255)
-            plot.setXRange(0, self.buffer_size/self.sampling_rate)
+            plot.setXRange(-self.buffer_size/self.sampling_rate, 0)
             curve = plot.plot(pen=color)
             self.plots.append((curve, plot))  # Store both the plot and the curve handle
             self.canvas_layout.addWidget(plot)
