@@ -1,8 +1,9 @@
 import serial
 import sys
-import platform
 import serial.tools.list_ports
 import time
+import platform
+import pandas as pd
 
 def connect_to_board(baudrate):
     board_ports = list(serial.tools.list_ports.comports())
@@ -30,16 +31,22 @@ def connect_to_board(baudrate):
         print("Unsupported platform")
         sys.exit(1)
 
+def save_to_csv(dataframe):
+    """Save data to a CSV file."""
+    filename = "test.csv"
+    if filename:
+        dataframe.to_csv(filename, index=False)
+
 
 # Configure the serial port
-port = connect_to_board(1000000)
+port = connect_to_board(115200)
 
-# Create a buffer to store the received data
-buffer_size = 128
-buffer = bytearray(buffer_size)
+dataframe = pd.DataFrame(columns=['data'])
+count = 0
 
 # Read and store the data in the buffer
 while True:
+    count += 1
     # Read data from the serial port, blocks until 
     data = port.readline().decode().strip()
     
@@ -48,9 +55,11 @@ while True:
     
     # Process the received data
     # ...
-    # decoded_buffer = list(data)
-
 
     # Print the received data
     print(data)
+    dataframe = dataframe.append({'data': data}, ignore_index=True)
     time.sleep(0.01)
+    if count == 1000:
+        save_to_csv(dataframe)
+        break

@@ -16,6 +16,7 @@ import numpy as np
 import pyqtgraph as pg
 import pandas as pd
 import qdarkstyle
+import scipy.signal as signal
 
 
 class SerialThread(QThread):
@@ -25,7 +26,7 @@ class SerialThread(QThread):
 
     data_received = pyqtSignal(np.ndarray)
 
-    def __init__(self, ser, buffers, channels, parent=None):
+    def __init__(self, ser, buffers, channels, sampling_rate, parent=None):
         """
         Constructor for SerialThread class.
 
@@ -41,6 +42,14 @@ class SerialThread(QThread):
         self.running = True
         self.count = 0
 
+        self.sampling_rate = sampling_rate # Sample frequency (Hz)
+        notch_freq = 50.0  # Frequency to be removed from signal (Hz)
+        quality_factor = 10.0  # Quality factor
+        b_notch, a_notch = signal.iirnotch(notch_freq, quality_factor, float(self.sampling_rate))
+        self.b_notch = b_notch
+        self.a_notch = a_notch
+        self.buffer_size = 4 * self.sampling_rate  # 4 second window
+
     def run(self):
         """Run method for the thread."""
         while self.running:
@@ -54,7 +63,14 @@ class SerialThread(QThread):
             if self.count == 1:  # set fps
                 self.count = 0
                 try:
-                    to_send = np.array([np.array(buffer) for buffer in self.buffers])
+                    if self.buffers[0].size == self.buffer_size:
+                        print("filtering")
+                        to_send = np.array([signal.lfilter(self.b_notch, self.a_notch, np.array(buffer)) for buffer in self.buffers])
+                        print(to_send)
+                        # to_send = signal.filtfilt(self.b_notch, self.a_notch, noisySignal)
+                    else:
+                        noisySignal = np.array([np.array(buffer) for buffer in self.buffers])
+                        to_send = noisySignal
                     self.data_received.emit(to_send)
                 except:
                     pass
@@ -88,7 +104,7 @@ class App(QMainWindow):
     Main application class for BSPM Monitor.
     """
 
-    def __init__(self, channels: int, baudrate=115200, demo_mode=False):
+    def __init__(self, channels: int, baudrate=115200, demo_mode=False, sampling_rate=250):
         """
         Constructor for App class.
 
@@ -103,8 +119,8 @@ class App(QMainWindow):
         self.demo_mode = demo_mode
 
         # Initialise parameters for data acquisition
-        self.sampling_rate = 250  # Hz
-        self.buffer_size = 2 * self.sampling_rate  # 2 second window
+        self.sampling_rate = sampling_rate  # Hz
+        self.buffer_size = 4 * self.sampling_rate  # 4 second window
         self.channels = channels
         self.baudrate = baudrate
         self.calls = 0  # fps counter variable
@@ -132,9 +148,9 @@ class App(QMainWindow):
     def delayed_init(self):
         """Delayed initialisation after the window is shown."""
         self.ser = self.connect_to_board()
-        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels)
+        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels, self.sampling_rate)
         self.serial_thread.data_received.connect(self.update_plots)
-        self.ser.write(channels.to_bytes(1, byteorder='big'))  # Tell the board how many channels to expect
+        # self.ser.write(self.channels.to_bytes(1, byteorder='big'))  # Tell the board how many channels to expect
 
     def setupUi(self):
         """Set up user interface."""
@@ -354,7 +370,7 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                if "XIAO" in p[1] and "1101" in p[0]:
+                if "XIAO" in p[1]: # and "1101" in p[0]:
                     board_port = p[0]
                     self.console.append(self.get_timestamp() + "Connected to board on port: " + board_port)
                     self.pause_button.setText("Start Monitoring")
@@ -396,5 +412,5 @@ class App(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    ecgapp = App(channels=48, baudrate=1000000, demo_mode=False)
+    ecgapp = App(channels=1, baudrate=1000000, demo_mode=False, sampling_rate=200)
     sys.exit(app.exec_())
