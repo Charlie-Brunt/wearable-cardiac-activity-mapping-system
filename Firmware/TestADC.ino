@@ -10,7 +10,7 @@ const long interval = 500;
 
 // Parameters
 const int frequency = 2;
-const int sampling_frequency = 100;
+const int sampling_frequency = 250;
 const int bit_depth = 8;
 int levels = pow(2, bit_depth) - 1;
 int channels = 1;
@@ -40,7 +40,6 @@ void loop() {
   Serial.write(value8bit);
   Serial.println();
   delay(1000/sampling_frequency);
-  blinkLED();
 }
 
 
