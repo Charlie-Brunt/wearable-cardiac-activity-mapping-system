@@ -2,56 +2,49 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h> // for Serial
 
-// LED
-const int ledPin = LED_RED;
-int ledState = LOW;
+// Timing
 unsigned long previousMillis = 0;
-const long interval = 500;
+unsigned long currentMillis = 0;
 
 // Parameters
-const int frequency = 2;
-const int sampling_frequency = 250;
+const int sampling_frequency = 1000;
 const int bit_depth = 8;
-int levels = pow(2, bit_depth) - 1;
-int channels = 1;
+int channels = 5;
 const int analogPin = 5;
-const int s0 = 2;
-const int s1 = 1;
-const int s2 = 0;
+const int s0Pin = 2;
+const int s1Pin = 1;
+const int s2Pin = 0;
+int channel_order[] = {0, 1, 2, 3, 4}; // Change this to match the order of the channels
 
 void setup() {
-  pinMode(ledPin, OUTPUT);
-  pinMode(s0, OUTPUT);
-  pinMode(s1, OUTPUT);
-  pinMode(s2, OUTPUT);
-  digitalWrite(s0, LOW);
-  digitalWrite(s1, LOW);
-  digitalWrite(s2, LOW);
+  pinMode(s0Pin, OUTPUT);
+  pinMode(s1Pin, OUTPUT);
+  pinMode(s2Pin, OUTPUT);
+  digitalWrite(s0Pin, LOW);
+  digitalWrite(s1Pin, LOW);
+  digitalWrite(s2Pin, LOW);
   Serial.begin(1000000);
   while ( !Serial ) delay(10);   // for nrf52840 with native usb
 }
 
 void loop() {
   // Get a fresh ADC value
-
-  // double value1 = analogRead(analogPin);
-  uint16_t value10bit = analogRead(analogPin); // Read a 10-bit value from analog pin A0
-  uint8_t value8bit = value10bit >> 2;
-  Serial.write(value8bit);
-  Serial.println();
-  delay(1000/sampling_frequency);
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= 1000/sampling_frequency) {
+    previousMillis = currentMillis;
+    for (int i = 0; i < channels; i++) {
+      selectChannel(channel_order[i]);
+      uint16_t value10bit = analogRead(analogPin); // Read a 10-bit value from analog pin A0
+      uint8_t value8bit = value10bit >> 2;
+      Serial.write(value8bit);
+    }
+    Serial.println();
+  }
 }
 
-
-void blinkLED() {
-  unsigned long currentMillis = millis();  // Get the current time
-
-  // Check if it's time to blink the LED
-  if (currentMillis - previousMillis >= interval) {
-    // Save the last time the LED blinked
-    previousMillis = currentMillis;
-
-    // If the LED is off, turn it on. If it's on, turn it off.
-    digitalWrite(ledPin, !digitalRead(ledPin));
-  }
+void selectChannel(int channel) {
+  // Convert channel number to binary
+  digitalWrite(s0Pin, channel & 0x01);
+  digitalWrite(s1Pin, (channel >> 1) & 0x01);
+  digitalWrite(s2Pin, (channel >> 2) & 0x01);
 }
