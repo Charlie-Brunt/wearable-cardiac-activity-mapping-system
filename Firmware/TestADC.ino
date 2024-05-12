@@ -7,8 +7,10 @@ unsigned long previousMillis = 0;
 unsigned long currentMillis = 0;
 
 // Parameters
+const int frequency = 2;
 const int sampling_frequency = 1000;
 const int bit_depth = 8;
+int levels = pow(2, bit_depth) - 1;
 int channels = 5;
 const int analogPin = 5;
 const int s0Pin = 2;

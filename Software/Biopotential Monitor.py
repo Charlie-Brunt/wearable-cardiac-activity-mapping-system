@@ -102,7 +102,7 @@ class App(QMainWindow):
         self.ser = self.connect_to_board()
 
         # Create a serial thread for reading data from the board
-        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels)
+        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels, self.sampling_rate)
 
         # Connect the data received signal to the update plots method
         self.serial_thread.data_received.connect(self.update_plots)
@@ -617,7 +617,7 @@ class SerialThread(QThread):
 
     data_received = pyqtSignal(np.ndarray)
 
-    def __init__(self, ser, buffers, channels, parent=None):
+    def __init__(self, ser, buffers, channels, sampling_rate, parent=None):
         """
         Constructor for SerialThread class.
 
@@ -632,6 +632,8 @@ class SerialThread(QThread):
         self.buffers = buffers
         self.running = True
         self.count = 0
+        self.sampling_rate = sampling_rate
+        self.framerate = 100
         
         self.notch_applied = False
         self.b_notch = None
@@ -655,7 +657,7 @@ class SerialThread(QThread):
                     self.buffers[i].extend([data[i]])
                 except:
                     pass
-            if self.count == 1:  # how often to update plots upon receiving data (sets fps)
+            if self.count == self.sampling_rate//self.framerate:  # how often to update plots upon receiving data (sets fps)
                 self.count = 0
                 try:
                     arrays = np.array([np.array(buffer) for buffer in self.buffers]) # convert ring buffers to numpy arrays
