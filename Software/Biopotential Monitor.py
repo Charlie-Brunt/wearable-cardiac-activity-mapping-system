@@ -1,3 +1,23 @@
+"""
+Biopotential Monitor
+
+Author: Charlie Brunt
+Date: 12-05-2024
+
+A real-time biopotential monitor for ECG signals using a serial connection to a microcontroller.
+
+Classes: 
+    App: Main application class for the biopotential monitor.
+    SerialThread: Thread for reading data from the serial port.
+
+Usage:
+    Run the script to start the biopotential monitor application. 
+    The application will display a real-time plot of a biopotential signal. 
+    The user can start and stop monitoring, record data to a CSV file, and 
+    save the plot as a PNG image. The application can be run in demo mode 
+    without a serial connection to the microcontroller.
+
+"""
 import sys
 import time
 import platform
@@ -24,7 +44,7 @@ class SerialThread(QThread):
 
     data_received = pyqtSignal(np.ndarray)
 
-    def __init__(self, ser, buffers, channels, sampling_rate, parent=None):
+    def __init__(self, ser, buffers, channels, parent=None):
         """
         Constructor for SerialThread class.
 
@@ -157,7 +177,7 @@ class App(QMainWindow):
         self.ser = self.connect_to_board()
 
         # Create a serial thread for reading data from the board
-        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels, self.sampling_rate)
+        self.serial_thread = SerialThread(self.ser, self.buffers, self.channels)
 
         # Connect the data received signal to the update plots method
         self.serial_thread.data_received.connect(self.update_plots)
@@ -196,10 +216,10 @@ class App(QMainWindow):
         self.lastupdate = time.time()
 
         # Initialize flags
-        self.started_monitoring = False
-        self.update_enabled = False
-        self.recording_active = False
-        self.render_override = False
+        self.started_monitoring = False # check for first time monitoring
+        self.update_enabled = False # flag to enable/disable plot updates
+        self.recording_active = False # flag to enable/disable recording to CSV
+        self.render_override = False # flag to render all plots upon update_enable=False
 
         # Create plots, schedule first update
         self.create_plots()
@@ -373,6 +393,7 @@ class App(QMainWindow):
         disabled to allow saving of plots as a PNG. Recording data to CSV is possible even when the plot 
         update flag is disabled.
         """
+
         if self.update_enabled:
             for i, (curve, plot) in enumerate(self.plots):
                 if self.is_plot_visible(plot):
@@ -392,7 +413,7 @@ class App(QMainWindow):
     def demo_update(self):
         """Update plots and FPS counter in demo mode."""
         if self.update_enabled:
-            self.ydata = (np.sin(5*(self.t/3.+ self.counter/9.)) + 1) * 127.5
+            self.ydata = (np.sin(20*(self.t/3.+ self.counter/9.)) + 1) * 64
             for curve, plot in self.plots:
                 if self.is_plot_visible(plot):
                     curve.setData(self.t, self.ydata)
