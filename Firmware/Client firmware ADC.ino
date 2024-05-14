@@ -7,7 +7,7 @@ const int frequency = 2; // Hz
 const int sampling_frequency = 250; // Hz
 const int bit_depth = 8;
 int levels = pow(2, bit_depth) - 1;
-int channels = 48;
+int channels = 5;
 
 BLEClientUart clientUart; // bleuart client
 BLEClientBas  clientBas;  // battery service client

@@ -225,7 +225,7 @@ void sendBatteryLevel() {
   if (millis() - batteryPreviousMillis >= 20000) {
     batteryPreviousMillis = millis();
     int vbatt = analogRead(PIN_VBAT);
-    float vrel = 2.961 * 3.6 * vbatt / 256);   // Resistance ratio 2.961, Vref = 3.6V 
+    float vrel = (2.961 * 3.6 * vbatt / 256);   // Resistance ratio 2.961, Vref = 3.6V 
     // Serial.println(digitalRead(PIN_CHG));       // 0:charge, 1:discharge 
     int level = 100 * (vrel - 3.2) / (4.2 - 3.2); // 3.2V to 4.2V
     blebas.write(level);
