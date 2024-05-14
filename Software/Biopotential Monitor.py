@@ -69,6 +69,10 @@ class App(QMainWindow):
         self.channels = channels
         self.baudrate = baudrate
         self.calls = 0  # fps counter variable
+        self.t = np.linspace(-self.buffer_size/self.sampling_rate, 0, num=self.buffer_size)
+        self.counter = 0
+        self.fps = 0.
+        self.lastupdate = time.time()
 
         # Initialize flags
         self.started_monitoring = False # check for first time monitoring
@@ -117,26 +121,6 @@ class App(QMainWindow):
         self.setCentralWidget(self.mainbox)
         self.layout = QHBoxLayout(self.mainbox)
         self.layout.setSpacing(0)
-
-        # Create a scroll area widget for plots
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.layout.addWidget(self.scroll)
-
-        # Create a widget for plots
-        self.canvas = QWidget()
-        self.scroll.setWidget(self.canvas)
-        self.canvas_layout = QVBoxLayout(self.canvas)
-        self.canvas_layout.setSpacing(0)
-
-        # Initialize data variables
-        self.t = np.linspace(-self.buffer_size/self.sampling_rate, 0, num=self.buffer_size)
-        self.counter = 0
-        self.fps = 0.
-        self.lastupdate = time.time()
-
-        # Create plots, schedule first update
-        self.create_plots()
 
         # Create a widget for controls
         self.controls_widget = QWidget()
@@ -322,6 +306,20 @@ class App(QMainWindow):
         self.controls_layout.addWidget(self.info_label)
         self.update_info_box()
 
+        # Create a scroll area widget for plots
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.layout.addWidget(self.scroll)
+
+        # Create a widget for plots
+        self.canvas = QWidget()
+        self.scroll.setWidget(self.canvas)
+        self.canvas_layout = QVBoxLayout(self.canvas)
+        self.canvas_layout.setSpacing(0)
+
+        # Create plots, schedule first update
+        self.create_plots()
+
     def create_plots(self):
         """Creates a plot widget for each channel and adds it to the scroll area."""
 
@@ -350,7 +348,7 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                if "XIAO" in p[1]: # and "1101" in p[0]:
+                if "XIAO" in p[1] and "1101" in p[0]:
                     board_port = p[0]
                     self.console_append("Connected to board on port: " + board_port)
                     self.pause_button.setText("Start Monitoring")
