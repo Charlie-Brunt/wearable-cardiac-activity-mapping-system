@@ -10,14 +10,11 @@ int levels = pow(2, bit_depth) - 1;
 int channels = 5;
 
 // Pin Definitions
-const int analogPin = 5;
-const int s0Pin = 2;
-const int s1Pin = 1;
+const int analogPin = 5; // ADC pin
+const int s0Pin = 2; // Multiplexer control pins
+const int s1Pin = 1; 
 const int s2Pin = 0;
 int channel_order[] = {0, 1, 2, 3, 4}; // Change this to match the order of the channels
-
-// Multiplexer setup
-#define 
 
 // Battery definitions
 #define PIN_VBAT        (32)  // D32 battery voltage
@@ -30,7 +27,6 @@ unsigned long previousTx = 0;
 unsigned long previousMillis = 0;
 unsigned long currentMillis = 0;
 unsigned long batteryPreviousMillis = 0;
-unsigned long batteryUpdateMillis = 0;
 const long interval = 1000/sampling_frequency;
 
 // data to send over BLE
@@ -39,16 +35,17 @@ const int bufferSize = 240;  // Adjust the buffer size as needed 243
 uint8_t valueBuffer[bufferSize];
 int bufferIndex = 0;
 
-// Create a buffer to hold the entire data
+// Create a buffer to hold the data
 byte dataBuffer[bufferSize];
 
+// BLE Services
 BLEDis bledis; // Device Information Service
 BLEUart bleuart; // UART service
 BLEBas blebas;  // Battery Service
 
 /**************************************************************************/
 /*!
-    @brief  Sets up the HW an the BLE module (this function is called
+    @brief  Sets up the HW and the BLE module (this function is called
             automatically on startup)
 */
 /**************************************************************************/
@@ -105,6 +102,7 @@ void setup(void)
   startAdv();
 }
 
+
 void startAdv(void)
 {
   Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
@@ -121,6 +119,7 @@ void startAdv(void)
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
   Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds  
 }
+
 
 void connect_callback(uint16_t conn_handle)
 {
@@ -151,6 +150,7 @@ void connect_callback(uint16_t conn_handle)
   delay(1000);
 }
 
+
 /**
  * Callback invoked when a connection is dropped
  * @param conn_handle connection where this event happens
@@ -165,6 +165,7 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
   Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
 }
 
+
 void loop(void)
 {  
   if (Bluefruit.connected())
@@ -178,16 +179,18 @@ void loop(void)
       // Reset buffer index
       bufferIndex = 0;
     }
-    
+
+    // Send battery level every 20 seconds
+    sendBatteryLevel(); 
   }
 }
 
+
 void updateReading()
 {
-  currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
+  if (millis() - previousMillis >= interval) {
     // Save the last time the LED blinked
-    previousMillis = currentMillis;
+    previousMillis = millis();
     for (int i = 0; i < channels; i++){
       reading = analogRead(analogPin);
       selectChannel(channel_order[i]);
@@ -197,12 +200,14 @@ void updateReading()
   }
 }
 
+
 void selectChannel(int channel) {
   // Convert channel number to binary
   digitalWrite(s0Pin, channel & 0x01);
   digitalWrite(s1Pin, (channel >> 1) & 0x01);
   digitalWrite(s2Pin, (channel >> 2) & 0x01);
 }
+
 
 void sendBufferOverBLE() {
   long currentTx = millis(); 
@@ -215,11 +220,10 @@ void sendBufferOverBLE() {
   previousTx = currentTx;
 }
 
+
 void sendBatteryLevel() {
-  batteryUpdateMillis = millis();
-  
-  if (batteryUpdateMillis - batteryPreviousMillis >= 20000) {
-    batteryPreviousMillis = batteryUpdateMillis;
+  if (millis() - batteryPreviousMillis >= 20000) {
+    batteryPreviousMillis = millis();
     int vbatt = analogRead(PIN_VBAT);
     float vrel = 2.961 * 3.6 * vbatt / 256);   // Resistance ratio 2.961, Vref = 3.6V 
     // Serial.println(digitalRead(PIN_CHG));       // 0:charge, 1:discharge 
@@ -227,4 +231,3 @@ void sendBatteryLevel() {
     blebas.write(level);
   }
 }
-

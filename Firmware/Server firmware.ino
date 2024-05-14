@@ -17,7 +17,7 @@ const long interval = 1000/sampling_frequency;
 
 // data to send in the throughput test
 double reading;
-const int bufferSize = 240;  // Adjust the buffer size as needed 243
+const int bufferSize = 240;  // Adjust the buffer size as needed (max 243)
 uint8_t valueBuffer[bufferSize];
 int bufferIndex = 0;
 

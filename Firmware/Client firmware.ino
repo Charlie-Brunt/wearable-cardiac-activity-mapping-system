@@ -1,4 +1,11 @@
 #include <bluefruit.h>
+#include <Arduino.h>
+#include <Adafruit_TinyUSB.h> // for Serial
+
+// LED
+const int ledPin = LED_RED;
+int ledState = LOW;
+unsigned long previousMillis = 0;
 
 // Parameters
 const int frequency = 2; // Hz
@@ -195,8 +202,18 @@ void loop()
     // Not discovered yet
     if ( clientUart.discovered() )
     {
-
+      blinkLED();
     }
     
+  }
+}
+
+void blinkLED()
+{
+  // Blink every 1 second
+  if ( (millis() - previousMillis) > 1000 )
+  {
+    previousMillis = millis();
+    Bluefruit.Central.ledToggle();
   }
 }
