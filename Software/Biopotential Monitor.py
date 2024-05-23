@@ -130,6 +130,11 @@ class App(QMainWindow):
         self.controls_layout.setAlignment(Qt.AlignTop)
         self.controls_layout.setSpacing(5)  # Adjust the spacing here
 
+        # Create a Battery Level Label
+        self.battery_label = QLabel("Battery Level: 100%")
+        self.controls_layout.addWidget(self.battery_label)
+        self.battery_label.setAlignment(Qt.AlignBottom | Qt.AlignCenter)
+
         # Create a console widget
         self.console = QTextEdit()
         self.console.setReadOnly(True)
@@ -397,6 +402,7 @@ class App(QMainWindow):
             new_row = pd.Series(data_with_timestamp, index=self.dataframe.columns)
             self.dataframe = self.dataframe._append(new_row, ignore_index=True)
         self.update_info_box()
+        self.update_battery_level()
 
     def demo_update(self):
         """Update plots and FPS counter in demo mode."""
@@ -535,6 +541,10 @@ class App(QMainWindow):
         info_text = f"{current_time} | {fps_info} | {channels_info} | {sampling_rate_info}"
         self.info_label.setText(info_text)
 
+    def update_battery_level(self):
+        """Update the battery level label."""
+        self.battery_label.setText(f"Battery Level: {self.serial_thread.battery_level}%")
+
     def apply_notch_filter(self):
         """Apply a notch filter to the data."""
         if not self.serial_thread.notch_applied:
@@ -631,7 +641,8 @@ class SerialThread(QThread):
         self.running = True
         self.count = 0
         self.sampling_rate = sampling_rate
-        self.framerate = 100
+        self.framerate = 200
+        self.battery_level = 100
         
         self.notch_applied = False
         self.b_notch = None
@@ -644,6 +655,8 @@ class SerialThread(QThread):
         self.hpf_applied = False
         self.b_hpf = None
         self.a_hpf = None
+
+        ser.flushInput()
 
     def run(self):
         """Run method for the thread."""
@@ -659,8 +672,8 @@ class SerialThread(QThread):
                 self.count = 0
                 try:
                     arrays = np.array([np.array(buffer) for buffer in self.buffers]) # convert ring buffers to numpy arrays
-                    to_send = self.digital_filtering(arrays)
-                    self.data_received.emit(to_send)
+                    self.to_send = self.digital_filtering(arrays)
+                    self.data_received.emit(self.to_send)
                 except:
                     pass
 
@@ -683,9 +696,13 @@ class SerialThread(QThread):
         """
         try:
             if self.ser.isOpen():
-                bytes = self.ser.readline().strip()
-                decoded_data = np.frombuffer(bytes, dtype=np.int8)
-                return decoded_data
+                try:
+                    bytes = self.ser.readline().strip()
+                    decoded_data = np.frombuffer(bytes, dtype=np.int8)
+                    # self.battery_level = decoded_data[-1]
+                    return decoded_data # [:-1]
+                except:
+                    return None # Return None if no data is read
             else:
                 print("Could not open serial port.")
                 return None

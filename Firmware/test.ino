@@ -180,7 +180,6 @@ void bleuart_rx_callback(BLEClientUart& uart_svc)
     uart_svc.read(dataBuffer, bufferSize);
     for (int i = 0; i < bufferSize; i++) {
       if (i % channels == 0) {
-        // writeBatteryLevel();
         Serial.println();
         delay(1000/sampling_frequency);
       }

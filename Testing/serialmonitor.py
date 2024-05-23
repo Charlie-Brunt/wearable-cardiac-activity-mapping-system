@@ -9,7 +9,7 @@ def connect_to_board(baudrate):
     if platform.system() == "Darwin":
         for p in board_ports:
             print(p[1])
-            if "XIAO" in p[1]:
+            if "XIAO" in p[1] and "11" in p[0]:
                 board_port = p[0]
                 print("Connecting to board on port:", board_port)
                 ser = serial.Serial(board_port, baudrate, timeout=1)
@@ -41,8 +41,8 @@ buffer = bytearray(buffer_size)
 # Read and store the data in the buffer
 while True:
     # Read data from the serial port, blocks until 
-    data = port.readline().decode().strip()
-    
+    data = port.readline().strip()
+    decoded_buffer = list(data)
     # Store the data in the buffer
     # buffer[:len(data)] = data
     
@@ -52,5 +52,5 @@ while True:
 
 
     # Print the received data
-    print(data)
-    time.sleep(0.01)
+    print(decoded_buffer)
+

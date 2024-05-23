@@ -14,13 +14,15 @@ const int analogPin = 5; // ADC pin
 const int s0Pin = 2; // Multiplexer control pins
 const int s1Pin = 1; 
 const int s2Pin = 0;
-int channel_order[] = {0, 1, 2, 3, 4}; // Change this to match the order of the channels
+int channel_order[] = {3, 2, 0, 4, 1}; // Change this to match the arrangement of the electrodes
 
 // Battery definitions
-#define PIN_VBAT        (32)  // D32 battery voltage
-#define PIN_VBAT_ENABLE (14)  // D14 LOW:read anable
-#define PIN_HICHG       (22)  // D22 charge current setting LOW:100mA HIGH:50mA
-#define PIN_CHG         (23)  // D23 charge indicatore LOW:charge HIGH:no charge
+#define BAT_READ 14            // P0_14 = 14  Reads battery voltage from divider on signal board. (PIN_VBAT is reading voltage divider on XIAO and is program pin 32 / or P0.31)
+#define CHARGE_LED 23          // P0_17 = 17  D23   YELLOW CHARGE LED
+#define HICHG 22               // P0_13 = 13  D22   Charge-select pin for Lipo for 100 mA instead of default 50mA charge
+const double vRef = 3.3; // Assumes 3.3V regulator output is ADC reference voltage
+const unsigned int numReadings = 256; // 10-bit ADC readings 0-1023, so the factor is 1024
+volatile int CHARGING; //is the battery connected and charging?   5V connected/charging = 0; disconnected = 1
 
 // Timing
 unsigned long previousTx = 0;
@@ -63,12 +65,9 @@ void setup(void)
   digitalWrite(s2Pin, LOW);
 
   // Battery level setup
-  pinMode(PIN_VBAT, INPUT);
-  pinMode(PIN_VBAT_ENABLE, OUTPUT);
-  pinMode(PIN_HICHG, OUTPUT);
-  pinMode(PIN_CHG, INPUT);
-  digitalWrite(PIN_VBAT_ENABLE, LOW); // VBAT read enable
-  digitalWrite(PIN_HICHG, LOW);       // charge current 100mA
+  pinMode (CHARGE_LED, INPUT);  //sets to detetct if charge LED is on or off to see if USB is plugged in
+  pinMode (HICHG, OUTPUT);  digitalWrite(HICHG, LOW);  //100 mA charging current if set to LOW and 50mA (actually about 20mA) if set to HIGH
+  pinMode(BAT_READ, OUTPUT);  digitalWrite(BAT_READ, LOW);// This is pin P0_14 = 14 and by pullling low to GND it provices path to read on pin 32 (P0,31) PIN_VBAT the voltage from divider on XIAO board
   
   // initialise ADC wireing_analog_nRF52.c:73
   analogReference(AR_DEFAULT);        // default 0.6V*6=3.6V  wireing_analog_nRF52.c:73
@@ -78,7 +77,12 @@ void setup(void)
   Serial.println("------------------------------\n");
 
   // Setup the BLE LED to be enabled on CONNECT
-  Bluefruit.autoConnLed(true);
+  if (digitalRead(CHARGE_LED) == 1) {
+    Bluefruit.autoConnLed(true);
+  }
+  else {
+    Bluefruit.autoConnLed(false);
+  }
   Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
   Bluefruit.begin();
   Bluefruit.setTxPower(4); // set Tx Power to +4dB; Check bluefruit.h for supported values
@@ -87,8 +91,8 @@ void setup(void)
   Bluefruit.Periph.setConnInterval(6, 12); // 7.5 - 15 ms
 
   // Configure and Start Device Information Service
-  bledis.setManufacturer("Adafruit Industries");
-  bledis.setModel("Bluefruit Feather52");
+  bledis.setManufacturer("SEEED");
+  bledis.setModel("Seeed XIAO nRF52840");
   bledis.begin();
 
   // Configure and Start BLE Uart Service
@@ -220,14 +224,15 @@ void sendBufferOverBLE() {
   previousTx = currentTx;
 }
 
-
 void sendBatteryLevel() {
-  if (millis() - batteryPreviousMillis >= 20000) {
+  if (millis() - batteryPreviousMillis >= 2000) {
     batteryPreviousMillis = millis();
-    int vbatt = analogRead(PIN_VBAT);
-    float vrel = (2.961 * 3.6 * vbatt / 256);   // Resistance ratio 2.961, Vref = 3.6V 
-    // Serial.println(digitalRead(PIN_CHG));       // 0:charge, 1:discharge 
-    int level = 100 * (vrel - 3.2) / (4.2 - 3.2); // 3.2V to 4.2V
+    CHARGING = digitalRead(CHARGE_LED);
+    unsigned int adcCount = analogRead(PIN_VBAT);//  PIN_VBAT is reading voltage divider on XIAO and is program pin 32 or P0.31??
+    double adcVoltage = (adcCount * vRef) / numReadings;
+    double vBat = adcVoltage * 3.30014; // Voltage divider from Vbat to ADC  // was set at 1510.0...set your own value to calibrate to actual voltage reading by your voltmeeter
+    double level = 100 * (vBat - 3.2) / (4.2 - 3.2); // 3.2V to 4.2V
+    printf("adcCount = %3u = 0x%03X, adcVoltage = %.3fV, vBat = %.3f, level = %.1f percent\n", adcCount, adcCount, adcVoltage, vBat, level);  delay(10);
     blebas.write(level);
   }
 }
