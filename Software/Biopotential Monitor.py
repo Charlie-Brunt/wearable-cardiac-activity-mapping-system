@@ -717,5 +717,5 @@ class SerialThread(QThread):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    ecgapp = App(channels=1, baudrate=1000000, demo_mode=False, sampling_rate=250)
+    ecgapp = App(channels=5, baudrate=1000000, demo_mode=False, sampling_rate=250)
     sys.exit(app.exec_())
