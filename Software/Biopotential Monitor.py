@@ -65,7 +65,7 @@ class App(QMainWindow):
 
         # Initialise parameters for data acquisition
         self.sampling_rate = sampling_rate  # Hz
-        self.buffer_size = 4 * self.sampling_rate  # 4 second window
+        self.buffer_size = 6 * self.sampling_rate  # 4 second window
         self.channels = channels
         self.baudrate = baudrate
         self.calls = 0  # fps counter variable
@@ -353,7 +353,7 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                if "XIAO" in p[1] and "1101" in p[0]:
+                if "XIAO" in p[1] and "101" in p[0]:
                     board_port = p[0]
                     self.console_append("Connected to board on port: " + board_port)
                     self.pause_button.setText("Start Monitoring")
@@ -504,7 +504,7 @@ class App(QMainWindow):
     def save_to_csv(self, dataframe):
         """Save data to a CSV file."""
         current_datetime = datetime.now()
-        datetime_string = current_datetime.strftime("%Y-%m-%d-%H-%M-%S")
+        datetime_string = current_datetime.strftime("%Y-%m-%d %H:%M:%S.%f")
         filename = datetime_string + ".csv"
         if filename:
             dataframe.to_csv("Data/"+filename, index=False)
@@ -656,7 +656,7 @@ class SerialThread(QThread):
         self.b_hpf = None
         self.a_hpf = None
 
-        ser.flushInput()
+        self.ser.flushInput()
 
     def run(self):
         """Run method for the thread."""
@@ -717,5 +717,5 @@ class SerialThread(QThread):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    ecgapp = App(channels=5, baudrate=1000000, demo_mode=False, sampling_rate=250)
+    ecgapp = App(channels=1, baudrate=1000000, demo_mode=False, sampling_rate=250)
     sys.exit(app.exec_())

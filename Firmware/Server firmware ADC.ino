@@ -70,19 +70,13 @@ void setup(void)
   pinMode(BAT_READ, OUTPUT);  digitalWrite(BAT_READ, LOW);// This is pin P0_14 = 14 and by pullling low to GND it provices path to read on pin 32 (P0,31) PIN_VBAT the voltage from divider on XIAO board
   
   // initialise ADC wireing_analog_nRF52.c:73
-  analogReference(AR_DEFAULT);        // default 0.6V*6=3.6V  wireing_analog_nRF52.c:73
   analogReadResolution(8);           // wireing_analog_nRF52.c:39
 
   Serial.println("Bluefruit52 ECG Server");
   Serial.println("------------------------------\n");
 
   // Setup the BLE LED to be enabled on CONNECT
-  if (digitalRead(CHARGE_LED) == 1) {
-    Bluefruit.autoConnLed(true);
-  }
-  else {
-    Bluefruit.autoConnLed(false);
-  }
+  Bluefruit.autoConnLed(false);
   Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
   Bluefruit.begin();
   Bluefruit.setTxPower(4); // set Tx Power to +4dB; Check bluefruit.h for supported values
@@ -220,19 +214,19 @@ void sendBufferOverBLE() {
 
   // Transmit the entire buffer over BLE
   bleuart.write(dataBuffer, bufferSize);
-  Serial.println((bufferSize*1000)/(currentTx - previousTx));
+  // Serial.println((bufferSize*1000)/(currentTx - previousTx));
   previousTx = currentTx;
 }
 
 void sendBatteryLevel() {
-  if (millis() - batteryPreviousMillis >= 2000) {
+  if (millis() - batteryPreviousMillis >= 3000) {
     batteryPreviousMillis = millis();
     CHARGING = digitalRead(CHARGE_LED);
     unsigned int adcCount = analogRead(PIN_VBAT);//  PIN_VBAT is reading voltage divider on XIAO and is program pin 32 or P0.31??
     double adcVoltage = (adcCount * vRef) / numReadings;
-    double vBat = adcVoltage * 3.30014; // Voltage divider from Vbat to ADC  // was set at 1510.0...set your own value to calibrate to actual voltage reading by your voltmeeter
+    double vBat = adcVoltage * 3.3; // Voltage divider from Vbat to ADC  // was set at 1510.0...set your own value to calibrate to actual voltage reading by your voltmeeter
     double level = 100 * (vBat - 3.2) / (4.2 - 3.2); // 3.2V to 4.2V
     printf("adcCount = %3u = 0x%03X, adcVoltage = %.3fV, vBat = %.3f, level = %.1f percent\n", adcCount, adcCount, adcVoltage, vBat, level);  delay(10);
-    blebas.write(level);
+    blebas.write(min(100, level));
   }
 }
