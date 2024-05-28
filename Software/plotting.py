@@ -61,20 +61,18 @@ def save_subplots(y, ylims=(-1500,1500), xlims=(0)):
     # plt.savefig(path+filename+".png", bbox_inches='tight')
     plt.show()
 
-def save_subplots_spectogram(y, ylims=(-1500,1500), xlims=(0)):
+def save_subplots_spectogram(y, ylims=(-500,-250), xlims=(0)):
     x = np.arange(0, len(y)/250, 1/250)
     y = y - np.mean(y) # offset removal
-    filtered_y0 = signal.filtfilt(*signal.bessel(6, 15, btype="low", fs=250), y)
-    filtered_y = signal.filtfilt(*signal.iirnotch(50, 5, 250), filtered_y0)
-    rectified_y = np.absolute(filtered_y-np.mean(filtered_y))
-    smoothed_y = movingaverage(rectified_y, n=100)
+    y = y/256 * 3.3 / 1100 * 1000000
+    y = signal.filtfilt(*signal.bessel(6, (0.5, 100), btype="bandpass", fs=250), y)
 
-    f, t, Sxx = signal.spectrogram(y, fs=250, window=("hamming"), nperseg=512, noverlap=512//16, nfft=512, scaling="density")
+    f, t, Sxx = signal.spectrogram(y, fs=250, nperseg=1024, noverlap=1024/16, nfft=2048, scaling="density")
     logged_Sxx = 20*np.log10(Sxx)
 
     fig, axs = plt.subplots(2, 1, sharex=True)
-    axs[0].plot(x, y , label="raw", linewidth=1, color="blue")
-    axs[1].pcolormesh(t, f, logged_Sxx, shading='gouraud', cmap="viridis")
+    axs[0].plot(x, y , label="raw", linewidth=1, color="#708fff")
+    axs[1].pcolormesh(t, f, logged_Sxx, shading='gouraud')
 
     axs[0].set_xlim(xlims)
     axs[0].set_ylim(ylims)
@@ -83,13 +81,13 @@ def save_subplots_spectogram(y, ylims=(-1500,1500), xlims=(0)):
     axs[1].set_ylabel("Frequency (Hz)")
 
     fig.suptitle("Signal and Spectogram")
-    fig.legend(loc="lower left", ncol=4)
-    # fig.tight_layout()
+    fig.legend()
+    fig.tight_layout()
 
-    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
-    # plt.savefig(path+filename+".png", bbox_inches='tight')
-    plt.show()
+    plt.savefig(path+filename+".png", bbox_inches='tight')
+    # plt.show()
 
 def save_plot_channels(df, title, ylims=(-1000,1000), xlims=(0)):
     x = np.arange(0, len(df)/250, 1/250)
@@ -128,7 +126,7 @@ def save_plot_channels2(df, title, ylims=(-1000,1000), xlims=(0), channels=[1,2,
     for i in channels:
         y = (df["Channel_"+str(i)] / 256) * 3.3 / 1100 * 1000000
         y = y - np.mean(y) # offset removal
-        filtered_y0 = signal.filtfilt(*signal.butter(6, (0.5, 40), btype="bandpass", fs=250), y)
+        filtered_y0 = signal.filtfilt(*signal.butter(6, (1.5, 40), btype="bandpass", fs=250), y)
         channel_data.append(filtered_y0)
 
     colors = ["#ff5e5e", "#ff5790", "#e964c1", "#bb7ae8", "#708fff"]
@@ -148,7 +146,7 @@ def save_plot_channels2(df, title, ylims=(-1000,1000), xlims=(0), channels=[1,2,
     fig.tight_layout()
     # plt.subplots_adjust(hspace=0.3)
 
-    filename = title + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = title + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
     plt.savefig(path+filename+".png", bbox_inches='tight')
     # plt.show()
@@ -182,6 +180,8 @@ def SNR(data, analysis_interval, threshold=250):
     for peak in peaks:
         noise[peak - 12 : peak + 12] = 0
     noise = signal.filtfilt(*signal.butter(6, (10, 100), btype="bandpass", fs=250), noise)
+
+    y = y - noise
     signal_power = np.mean(y**2)
     noise_power = np.mean(noise**2)
 
@@ -197,7 +197,7 @@ def SNR(data, analysis_interval, threshold=250):
     axs[1].set_title("Noise Distribution")
     axs[0].set_xlim(analysis_interval)
     fig.tight_layout()
-    filename = "SNR" + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = "SNR" + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
     plt.savefig(path+filename+".png", bbox_inches='tight')
 
@@ -221,6 +221,7 @@ def SNR_emg(data, analysis_interval):
     # for peak in peaks:
     #     noise[peak - 12 : peak + 12] = 0
     noise = signal.filtfilt(*signal.butter(6, (10, 100), btype="bandpass", fs=250), noise)
+    y = y - noise
     signal_power = np.mean(y**2)
     noise_power = np.mean(noise**2)
 
@@ -236,13 +237,12 @@ def SNR_emg(data, analysis_interval):
     axs[1].set_title("Noise Distribution")
     axs[0].set_xlim(analysis_interval)
     fig.tight_layout()
-    filename = "SNR" + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = "SNR" + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
     plt.savefig(path+filename+".png", bbox_inches='tight')
 
     SNR = 10*np.log10(signal_power/noise_power)
     return SNR
-
 
 
 if __name__ == "__main__":
@@ -256,12 +256,15 @@ if __name__ == "__main__":
     path = os.getcwd() + "/Data/"
     files = os.listdir(path)
 
-    filename = "eeg 1.csv"
+    filename = "ecg agcl.csv"
     df = pd.read_csv(path+filename)
     # save_plot_channels2(df, title="Two-Channel EMG (Wrist Flexion) - Eutectogel", xlims=(15, 20), ylims=(-1000, 1000), channels=[2,4])
-    # save_plot_channels2(df, title="Five-Channel ECG with Bandpass - Eutectogel", xlims=(2, 7), ylims=(-1000, 1000), channels=[1, 2, 3, 4, 5])
+    # save_plot_channels2(df, title="Ag-AgCl Benchmark", xlims=(0, 5), ylims=(-250, 500), channels=[1])
+    save_subplots_spectogram(df["Channel_1"], xlims=(2, 60), ylims=(-250, 500))
 
-    # snr = SNR(df["Channel_2"], (0, 7), threshold=500)
-    snr = SNR_emg(df["Channel_2"], (50, 54))
-    print(snr)
+    # snr = SNR(df["Channel_2"], (0, 7), threshold=400)
+    # snr = SNR_emg(df["Channel_2"], (50, 54))
+    # snr = SNR_emg(df["Channel_2"], (15, 20))
+
+    # print(snr)
     
