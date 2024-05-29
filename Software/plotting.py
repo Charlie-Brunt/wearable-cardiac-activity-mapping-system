@@ -164,6 +164,11 @@ def pan_tompkins(data, fs):
     peaks, _ = signal.find_peaks(mw_y, height=0.1*np.max(mw_y))
     return peaks
 
+def gaussian_fit(xdata,ydata):
+    mu = np.sum(xdata*ydata)/np.sum(ydata)
+    sigma = np.sqrt(np.abs(np.sum((xdata-mu)**2*ydata)/np.sum(ydata)))
+    return mu, sigma
+
 def SNR(data, analysis_interval, threshold=250):
     data = data / 256 * 3.3 / 1100 * 1000000
     # data = data - np.mean(data)
@@ -197,13 +202,14 @@ def SNR(data, analysis_interval, threshold=250):
     axs[1].set_xlabel("Amplitude (uV)")
     axs[1].set_ylabel("Frequency Density")
     axs[1].set_title("Noise Distribution")
-
-    mean, std = stats.norm.fit(noise)
+    
     xmin, xmax = axs[1].get_xlim()
     x = np.linspace(xmin, xmax, 100)
+    noise = noise.clip(min=-50, max=50)
+    mean, std = stats.norm.fit(noise, method="MM")
     p = stats.norm.pdf(x, mean, std)
     axs[1].plot(x, p, 'k', linewidth=2, label='Fitted Gaussian')
-
+    axs[1].set_xlim(-300, 300)
     axs[0].set_xlim(analysis_interval)
     fig.tight_layout()
     filename = "SNR" + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
@@ -247,6 +253,7 @@ def SNR_emg(data, analysis_interval):
 
     mean, std = stats.norm.fit(noise)
     xmin, xmax = axs[1].get_xlim()
+    axs[1].set_xlim(-500, 500)
     x = np.linspace(xmin, xmax, 100)
     p = stats.norm.pdf(x, mean, std)
     axs[1].plot(x, p, 'k', linewidth=2, label='Fitted Gaussian')
@@ -272,15 +279,17 @@ if __name__ == "__main__":
     path = os.getcwd() + "/Data/"
     files = os.listdir(path)
 
-    filename = "eeg 1.csv"
+    filename = "ecg precordial 2.csv"
     df = pd.read_csv(path+filename)
     # save_plot_channels2(df, title="Two-Channel EMG (Wrist Flexion) - Eutectogel", xlims=(15, 20), ylims=(-1000, 1000), channels=[2,4])
     # save_plot_channels2(df, title="Ag-AgCl Benchmark", xlims=(0, 5), ylims=(-250, 500), channels=[1])
     # save_subplots_spectogram(df["Channel_1"], xlims=(2, 60), ylims=(-250, 500))
 
-    # snr = SNR(df["Channel_2"], (0, 7), threshold=400)
-    snr = SNR_emg(df["Channel_2"], (50, 54))
+    snr = SNR(df["Channel_4"], (0, 10), threshold=400)
+    # snr = SNR_emg(df["Channel_4"], (0, 10))
     # snr = SNR_emg(df["Channel_2"], (15, 20))
 
     print(snr)
+
+
     
