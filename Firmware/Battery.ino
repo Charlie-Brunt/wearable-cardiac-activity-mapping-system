@@ -1,3 +1,5 @@
+// Program to read battery voltage on XIAO board
+
 #include <math.h>
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h> // for Serial

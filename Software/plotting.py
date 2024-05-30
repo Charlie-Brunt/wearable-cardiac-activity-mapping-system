@@ -23,7 +23,7 @@ def save_plot(y, ylims=(-1500,1500), xlims=(0)):
     plt.plot(x, y , label="raw", linewidth=1)
     # plt.plot(x, rectified_y - 1500, label="rectified", linewidth=1)
     # plt.plot(x, smoothed_y - 4500, label="smoothed", linewidth=1)
-    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     plt.xlabel("Time (s)")
     plt.ylabel("Amplitude (uV)")
     plt.xlim(xlims)
@@ -56,7 +56,7 @@ def save_subplots(y, ylims=(-1500,1500), xlims=(0)):
     fig.legend(loc="lower left", ncol=4)
     fig.tight_layout()
 
-    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = "signal processing " + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
     # plt.savefig(path+filename+".png", bbox_inches='tight')
     plt.show()
@@ -115,7 +115,7 @@ def save_plot_channels(df, title, ylims=(-1000,1000), xlims=(0)):
     fig.tight_layout()
     # plt.subplots_adjust(hspace=0.3)
 
-    filename = title + str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    filename = title + str(datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S"))
     path = os.getcwd() + "/Software/Plots/"
     plt.savefig(path+filename+".png", bbox_inches='tight')
     # plt.show()
