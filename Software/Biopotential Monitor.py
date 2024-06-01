@@ -353,7 +353,7 @@ class App(QMainWindow):
         board_ports = list(serial.tools.list_ports.comports())
         if platform.system() == "Darwin":
             for p in board_ports:
-                if "XIAO" in p[1] and "101" in p[0]:
+                if "XIAO" in p[1]: # and "101" in p[0]:
                     board_port = p[0]
                     self.console_append("Connected to board on port: " + board_port)
                     self.pause_button.setText("Start Monitoring")
