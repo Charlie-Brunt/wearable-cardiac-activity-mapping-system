@@ -3,10 +3,7 @@
 #include <cstring>
 
 // Parameters
-const int frequency = 2; // Hz
 const int sampling_frequency = 250; // Hz
-const int bit_depth = 8;
-int levels = pow(2, bit_depth) - 1;
 int channels = 5;
 
 // Pin Definitions
@@ -187,11 +184,10 @@ void loop(void)
 void updateReading()
 {
   if (millis() - previousMillis >= interval) {
-    // Save the last time the LED blinked
     previousMillis = millis();
     for (int i = 0; i < channels; i++){
-      reading = analogRead(analogPin);
-      selectChannel(channel_order[i]);
+      reading = analogRead(analogPin); // change these two lines
+      selectChannel(channel_order[i]); // to read from AD4695
       valueBuffer[bufferIndex] = reading;
       bufferIndex++;
     }

@@ -402,7 +402,7 @@ class App(QMainWindow):
             new_row = pd.Series(data_with_timestamp, index=self.dataframe.columns)
             self.dataframe = self.dataframe._append(new_row, ignore_index=True)
         self.update_info_box()
-        self.update_battery_level()
+        # self.update_battery_level()
 
     def demo_update(self):
         """Update plots and FPS counter in demo mode."""
