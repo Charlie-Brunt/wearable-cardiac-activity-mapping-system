@@ -65,13 +65,13 @@ class App(QMainWindow):
 
         # Initialise parameters for data acquisition
         self.sampling_rate = sampling_rate  # Hz
-        self.buffer_size = 6 * self.sampling_rate  # 4 second window
+        self.buffer_size = 6 * self.sampling_rate  # 6 second window
         self.channels = channels
         self.baudrate = baudrate
         self.calls = 0  # fps counter variable
         self.t = np.linspace(-self.buffer_size/self.sampling_rate, 0, num=self.buffer_size)
         self.counter = 0
-        self.fps = 0.
+        self.fps = 0
         self.lastupdate = time.time()
 
         # Initialize flags
@@ -717,5 +717,5 @@ class SerialThread(QThread):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     app.setStyleSheet(qdarkstyle.load_stylesheet_pyqt5())
-    ecgapp = App(channels=5, baudrate=1000000, demo_mode=False, sampling_rate=250)
+    ecgapp = App(channels=32, baudrate=1000000, demo_mode=False, sampling_rate=250)
     sys.exit(app.exec_())
